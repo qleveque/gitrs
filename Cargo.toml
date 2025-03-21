@@ -1,0 +1,13 @@
+[package]
+name = "gitrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.29.0"
+crossterm = "0.28.1"
+syntect = "5.2.0"
+git2 = "0.20.1"
+openssl = { version = "0.10", features = ["vendored"] }
+chrono = "0.4.40"
+clap = "4.5.34"
