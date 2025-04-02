@@ -2,19 +2,17 @@ use crate::input::basic_movements;
 use crate::{config::Config, git::FileStatus};
 
 use std::collections::HashMap;
-use std::path::Path;
 
 use crate::config::{get_status_command_to_run, run_command};
 
-use crate::git::{compute_git_files, GitFile, StagedStatus};
+use crate::git::{git_add_restore, git_status_output, GitFile, StagedStatus};
 
-use git2::Repository;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::style::Style;
 use ratatui::widgets::{ListState, Paragraph, StatefulWidget};
 
-use crossterm::event::{self, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::Terminal;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -23,32 +21,6 @@ use ratatui::{
 };
 
 use std::io;
-
-pub fn git_add_restore(files: &mut HashMap<String, GitFile>, repo: &Repository, reload: &mut bool) {
-    let mut index = repo.index().unwrap();
-    let head = repo.head().unwrap();
-    let head_commit = head.peel_to_commit().unwrap();
-    for (filename, git_file) in files.iter() {
-        let path = Path::new(filename);
-        if git_file.init_unstaged_status != FileStatus::None
-            && git_file.unstaged_status == FileStatus::None
-            && git_file.staged_status != FileStatus::None
-        {
-            let _ = match git_file.staged_status {
-                FileStatus::Deleted => index.remove_path(path),
-                _ => index.add_path(path),
-
-            };
-        } else if git_file.init_staged_status != FileStatus::None
-            && git_file.staged_status == FileStatus::None
-            && git_file.unstaged_status != FileStatus::None
-        {
-            let _ = repo.reset_default(Some(head_commit.as_object()), &[&filename]);
-        }
-    }
-    let _ = index.write();
-    *reload = true;
-}
 
 fn compute_tables(
     files: &HashMap<String, GitFile>,
@@ -89,6 +61,33 @@ fn toggle_stage_git_file(git_file: &mut GitFile, staged_status: StagedStatus) {
     match staged_status {
         StagedStatus::Unstaged => git_file.set_status(FileStatus::None, git_file.unstaged_status),
         StagedStatus::Staged => git_file.set_status(git_file.staged_status, FileStatus::None),
+    }
+}
+
+fn parse_git_status(files: &mut HashMap<String, GitFile>, config: &Config) {
+    files.clear();
+    let git_status = git_status_output(config);
+    for line in git_status.lines() {
+        let filename: String = line[2..].trim().to_string();
+        let second: char = line.chars().nth(1).unwrap();
+        let first: char = line.chars().nth(0).unwrap();
+
+        let unstaged_status = match second {
+            '?' => FileStatus::New,
+            'D' => FileStatus::Deleted,
+            'M' => FileStatus::Modified,
+            'U' => FileStatus::Unmerged,
+            _ => FileStatus::None,
+        };
+
+        let staged_status = match first {
+            'A' => FileStatus::New,
+            'D' => FileStatus::Deleted,
+            'M' => FileStatus::Modified,
+            _ => FileStatus::None,
+        };
+        let git_file = GitFile::new(unstaged_status, staged_status);
+        files.insert(filename.clone(), git_file);
     }
 }
 
@@ -145,12 +144,9 @@ pub fn status_app(
     state.select_first();
     let mut default_state = ListState::default();
 
-    let repo = Repository::open(Path::new(".")).unwrap();
-
     while !quit && !hard_quit {
         if reload {
-            files.clear();
-            compute_git_files(&repo, &mut files, &config);
+            parse_git_status(&mut files, &config);
             compute_tables(&files, &mut unstaged_table, &mut staged_table);
             reload = false;
         }
@@ -179,7 +175,7 @@ pub fn status_app(
             }
 
             let chunks = Layout::default()
-                .direction(Direction::Horizontal)
+                .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(f.area());
 
@@ -219,18 +215,23 @@ pub fn status_app(
         })?;
 
         if event::poll(std::time::Duration::from_millis(100))? {
-            let event::Event::Key(KeyEvent {
-                code, modifiers, ..
-            }) = event::read()?
-            else {
+            let Event::Key(KeyEvent {
+                kind,
+                code,
+                modifiers,
+                ..
+            }) = event::read()? else {
                 continue;
             };
+            if kind != KeyEventKind::Press {
+                continue;
+            }
 
             if empty_tables {
                 match code {
                     KeyCode::Char('q') | KeyCode::Enter => hard_quit = true,
                     KeyCode::Char('r') => {
-                        git_add_restore(&mut files, &repo, &mut reload);
+                        git_add_restore(&mut files, &config, &mut reload);
                     }
                     _ => (),
                 }
@@ -241,7 +242,6 @@ pub fn status_app(
                 StagedStatus::Staged => &staged_table,
                 StagedStatus::Unstaged => &unstaged_table,
             };
-            // TODO: handle properly errors
             let idx = state.selected().unwrap();
             let (_, filename) = &table.get(idx).unwrap();
             let git_file = files.get_mut(filename).unwrap();
@@ -249,7 +249,7 @@ pub fn status_app(
             if let Some(command) =
                 get_status_command_to_run(&config, code, &git_file, staged_status)
             {
-                git_add_restore(&mut files, &repo, &mut reload);
+                git_add_restore(&mut files, &config, &mut reload);
                 let mut clear = false;
 
                 run_command(
@@ -265,14 +265,22 @@ pub fn status_app(
                 }
                 continue;
             }
-
             if basic_movements(code, modifiers, &mut state, height, &mut quit) {
                 continue;
             }
 
+            let table = match staged_status {
+                StagedStatus::Staged => &staged_table,
+                StagedStatus::Unstaged => &unstaged_table,
+            };
+            // TODO: handle properly errors
+            let idx = state.selected().unwrap();
+            let (_, filename) = &table.get(idx).unwrap();
+            let git_file = files.get_mut(filename).unwrap();
+
             match code {
                 KeyCode::Char('r') => {
-                    git_add_restore(&mut files, &repo, &mut reload);
+                    git_add_restore(&mut files, &config, &mut reload);
                 }
                 KeyCode::Char('t') => {
                     toggle_stage_git_file(git_file, staged_status);
@@ -294,22 +302,25 @@ pub fn status_app(
                         switch_staged_status(&mut staged_status, &mut state);
                     }
                 }
-                KeyCode::Char('h') | KeyCode::Left => {
+                KeyCode::Char('J') => {
                     if unstaged_table.len() > 0 && staged_status == StagedStatus::Staged {
                         switch_staged_status(&mut staged_status, &mut state);
                     }
                 }
-                KeyCode::Char('l') | KeyCode::Right => {
+                KeyCode::Char('K') => {
                     if staged_table.len() > 0 && staged_status == StagedStatus::Unstaged {
                         switch_staged_status(&mut staged_status, &mut state);
                     }
                 }
+                KeyCode::Char('q') => {
+                    quit = true;
+                },
                 _ => (),
             }
         }
     }
     if quit {
-        git_add_restore(&mut files, &repo, &mut reload);
+        git_add_restore(&mut files, &config, &mut reload);
     }
     Ok(())
 }

@@ -139,10 +139,6 @@ pub fn get_show_command_to_run(config: &Config, key: KeyCode) -> Option<String> 
     get_command_to_run(config, key, &mut fields)
 }
 
-pub fn get_log_command_to_run(config: &Config, key: KeyCode) -> Option<String> {
-    let mut fields: Vec<(&str, bool)> = vec![("log", true)];
-    get_command_to_run(config, key, &mut fields)
-}
 pub fn get_blame_command_to_run(config: &Config, key: KeyCode) -> Option<String> {
     let mut fields: Vec<(&str, bool)> = vec![("blame", true)];
     get_command_to_run(config, key, &mut fields)

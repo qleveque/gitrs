@@ -1,6 +1,6 @@
 # gitrs
 
-A git TUI written in Rust with git2 and ratatui.
+A git TUI written in Rust with ratatui.
 
 ![demo](https://github.com/qleveque/gitrs/blob/main/resources/demo.gif?raw=true)
 
@@ -21,30 +21,22 @@ This is still a work in progress.
 ### `$ gitrs status`
 
 List new/modified/deleted files from the working tree and the staging area.
-This command still depends on the git executable because `Repository::statuses` is very slow on windows index.
 
 + <kbd>t</kbd> Stage/unstage selected file
 + <kbd>T</kbd> Stage/unstage all the files
 + <kbd>Tab</kbd> Switch between untracked and staged column
-+ <kbd>l</kbd>/<kbd>→</kbd> Select staged column
-+ <kbd>h</kbd>/<kbd>←</kbd> Select untracked column
++ <kbd>J</kbd>/<kbd>→</kbd> Select staged column
++ <kbd>K</kbd>/<kbd>←</kbd> Select untracked column
 + <kbd>r</kbd> Reload the view
-
-### `$ gitrs log [revision] [path] [--author=<author>]`
-
-Display commit history.
-
-+ <kbd>Enter</kbd> Show commit details
 
 ### `$ gitrs show [revision]`
 
 Show commit details: hash, references, author, date, commit title and message.
 Display the list of modified files.
 
-### `$ gitrs blame <file> [revision]`
+### `$ gitrs blame <file> [line]`
 
-Show the blame of the given file at the given revision (if any).
-This command still depends on the git executable due to the missing "Not Committed Yet" functionality missing in git2.
+Show the blame of the given file.
 + <kbd>Enter</kbd> Show commit defails
 + <kbd>h</kbd>/<kbd>←</kbd> Go to parent blame
 + <kbd>l</kbd>/<kbd>→</kbd> Go back to previous blame
@@ -57,7 +49,7 @@ You can create command shorcuts as follow:
 ```
 map <scope> <hotkey> [>!@]<command>
 ```
-`scope` can be either of `global`, `blame`, `log`, `show`, `status`, `staged`, `unstaged`, `unmerged`, `untracked`.
+`scope` can be either of `global`, `blame`, `show`, `status`, `staged`, `unstaged`, `unmerged`, `untracked`.
 
 + `!`: run and wait for the command to execute
 + `>`: like `!` but it exits gitrs after the command execution
@@ -87,6 +79,7 @@ map unstaged ! !git restore "%(file)"
 
 - [ ] Improve the code quality
 - [ ] Searchbar to search for a specific content
+- [ ] Add the `log` command
 - [ ] Add the `stash` command
 - [ ] Add the `reflog` command
 - [ ] Add the `branch` command

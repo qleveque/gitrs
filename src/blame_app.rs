@@ -1,17 +1,20 @@
 use crate::config::{get_blame_command_to_run, run_command, Config};
 
-use crate::git::{git_blame_output, ref_to_commit};
+use crate::git::{git_blame_output, CommitRef};
 use crate::input::basic_movements;
 use crate::show_app;
-use crate::ui::{author_name_from_commit, blame_from_commit, highlight_code};
+use crate::ui::style;
 
-use git2::{Commit, Repository};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, StatefulWidget};
 
-use crossterm::event::{self, KeyCode};
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Style as SyntectStyle, ThemeSet};
+use syntect::parsing::SyntaxSet;
+
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -21,10 +24,45 @@ use ratatui::{
 };
 
 use std::io;
-use std::process::exit;
 
-fn parse_git_blame(file: String, revision: Option<String>, config: &Config) -> (Vec<Option<String>>, Vec<String>) {
-    let output = git_blame_output(file, revision.clone(), &config);
+fn highlight_code(code: &Vec<String>) -> Vec<Line> {
+    let ps = SyntaxSet::load_defaults_newlines();
+    let ts = ThemeSet::load_defaults();
+    let syntax = ps.find_syntax_by_extension("rs").unwrap();
+    let mut h = HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]);
+
+    code.iter()
+        .map(|line| {
+            let ranges: Vec<(SyntectStyle, String)> = h
+                .highlight_line(&line, &ps)
+                .unwrap()
+                .into_iter()
+                .map(|(style, text)| (style, text.to_string())) // Convert &str to owned String
+                .collect();
+            let spans: Vec<Span> = ranges
+                .into_iter()
+                .map(|(style, text)| {
+                    Span::styled(
+                        text, // Now owns the string
+                        Style::default().fg(Color::Rgb(
+                            style.foreground.r,
+                            style.foreground.g,
+                            style.foreground.b,
+                        )),
+                    )
+                })
+                .collect();
+            Line::from(spans)
+        })
+        .collect()
+}
+
+fn parse_git_blame(
+    file: String,
+    revision: Option<String>,
+    config: &Config,
+) -> (Vec<Option<CommitRef>>, Vec<String>) {
+    let output = git_blame_output(file, revision.clone(), config);
 
     let mut blame_column = Vec::new();
     let mut code_column = Vec::new();
@@ -32,19 +70,20 @@ fn parse_git_blame(file: String, revision: Option<String>, config: &Config) -> (
     for line in output.lines() {
         let (blame, code) = line.split_once(')').unwrap();
         code_column.push(code.to_string());
-        let (hash, _) = blame.split_once(" ").unwrap();
+        let blame_text = blame.to_string() + ")";
+        let (hash, blame_text) = blame_text.split_once(" (").unwrap();
         // for initial commit
-        blame_column.push(if hash == "00000000" {
+        blame_column.push(if hash.starts_with("0000") {
             None
         } else {
-            let h = if hash.starts_with('^') {
-                // Return the string excluding the first character
-                &hash[1..]
-            } else {
-                hash
-            }
-            .to_string();
-            Some(h)
+            let metadata: Vec<&str> = blame_text.trim().split_whitespace().collect();
+            let author = metadata[..metadata.len() - 4].join(" ");
+            let date = metadata[metadata.len() - 4];
+            Some(CommitRef::new(
+                hash.to_string(),
+                author.to_string(),
+                date.to_string(),
+            ))
         });
     }
 
@@ -59,8 +98,8 @@ pub fn blame_app(
     line: usize,
 ) -> io::Result<()> {
     // model
-    let mut content: String;
-    let mut refs: Vec<Option<String>> = Vec::new();
+    let mut blames: Vec<Option<CommitRef>> = Vec::new();
+    let mut code: Vec<String>;
 
     let mut quit = false;
     let mut reload = true;
@@ -70,80 +109,86 @@ pub fn blame_app(
     let mut blame_list = List::default();
     let mut code_list = List::default();
     let mut state = ListState::default();
-    let mut blame_len = 0;
+    let mut max_blame_len = 0;
     state.select(Some(line - 1));
 
     let mut revisions: Vec<Option<String>> = vec![revision];
-
-    let repo = Repository::open(".").unwrap();
+    let mut first = true;
 
     while !quit {
         if reload {
-            let (new_refs, new_code) =
+            let (new_blames, new_code) =
                 parse_git_blame(file.clone(), revisions.last().unwrap().clone(), &config);
-            if new_code.len() == 0 {
+            if new_blames.len() == 0 {
                 revisions.pop();
-                if revisions.len() == 0 {
-                    exit(0);
+                continue;
+            }
+            max_blame_len = 0;
+            blames = new_blames;
+            code = new_code;
+            let len = blames.len();
+            let max_author_len = blames.iter().map(|opt_commit| {
+                match opt_commit {
+                    Some(commit) => commit.author.len(),
+                    _ => "Not Committed Yet".len(),
                 }
-            } else {
-                blame_len = "Not Committed Yet".len();
-                refs = new_refs;
-                content = new_code.join("\n").clone();
+            }).max().unwrap();
+            let max_line_len = format!("{}", blames.len()).len();
+            let blame_items: Vec<ListItem> = blames
+                .iter()
+                .enumerate()
+                .map(|(idx, opt_commit)| {
+                    let display = match opt_commit {
+                        Some(commit) => {
+                            let displayed_hash: String = commit.hash.chars().take(4).collect();
+                            let spans = vec![
+                                Span::styled(displayed_hash, style(Color::Blue)),
+                                Span::raw(" "),
+                                Span::styled(
+                                    format!("{:<max_author_len$}", commit.author.clone()),
+                                    style(Color::Yellow),
+                                ),
+                                Span::raw(" "),
+                                Span::styled(commit.date.clone(), style(Color::Blue)),
+                                Span::raw(" "),
+                                Span::styled(
+                                    format!("{:>max_line_len$}", idx),
+                                    style(Color::Yellow)
+                                ),
+                            ];
+                            let line = Line::from(spans);
+                            if max_blame_len < line.width() {
+                                max_blame_len = line.width()
+                            }
+                            line
+                        },
+                        _ => Line::from("Not Committed Yet".to_string()),
+                    };
+                    ListItem::new(display) // .style(style)
+                })
+                .collect();
+            blame_list = List::new(blame_items)
+                .block(Block::default())
+                .style(Style::default().fg(Color::White))
+                .highlight_style(Style::new().bg(Color::Black))
+                .scroll_padding(config.scroll_off);
+            let code_items: Vec<ListItem> = highlight_code(&code)
+                .iter()
+                .map(|line| {
+                    ListItem::new(line.clone()) // .style(style)
+                })
+                .collect();
+            code_list = List::new(code_items)
+                .block(Block::default().borders(Borders::LEFT))
+                .style(Style::default().fg(Color::White))
+                .highlight_style(Style::new().bg(Color::Black))
+                .scroll_padding(config.scroll_off);
 
-                let commits: Vec<Option<Commit>> = refs
-                    .iter()
-                    .map(|commit_ref| ref_to_commit(&repo, commit_ref.clone()))
-                    .collect();
-
-                let max_len_author = commits
-                    .iter()
-                    .filter_map(|c| c.as_ref().map(|c| author_name_from_commit(c).len()))
-                    .max()
-                    .unwrap_or(0);
-
-                let max_len_line = format!("{}", refs.len()).len();
-                let blame_items: Vec<ListItem> = commits
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, commit)| {
-                        let display = match commit {
-                            Some(commit) => {
-                                let display = blame_from_commit(commit.clone(), max_len_author, idx + 1, max_len_line);
-                                if blame_len < display.width() {
-                                    blame_len = display.width()
-                                }
-                                display
-                            },
-                            None => Line::from("Not Committed Yet".to_string()),
-                        };
-                        ListItem::new(display) // .style(style)
-                    })
-                    .collect();
-
-                blame_list = List::new(blame_items)
-                    .block(Block::default())
-                    .style(Style::default().fg(Color::White))
-                    .highlight_style(Style::new().bg(Color::Black))
-                    .scroll_padding(config.scroll_off);
-                let code_items: Vec<ListItem> = highlight_code(&file, &content)
-                    .iter()
-                    .map(|line| {
-                        ListItem::new(line.clone()) // .style(style)
-                    })
-                    .collect();
-                code_list = List::new(code_items)
-                    .block(Block::default().borders(Borders::LEFT))
-                    .style(Style::default().fg(Color::White))
-                    .highlight_style(Style::new().bg(Color::Black))
-                    .scroll_padding(config.scroll_off);
-
-                match state.selected() {
-                    None => state.select(Some(1)),
-                    Some(idx) => {
-                        if idx >= refs.len() {
-                            state.select(Some(refs.len() - 1));
-                        }
+            match state.selected() {
+                None => state.select(Some(len - 1)),
+                Some(idx) => {
+                    if idx >= len {
+                        state.select(Some(len - 1));
                     }
                 }
             }
@@ -155,10 +200,20 @@ pub fn blame_app(
             let size = f.area();
             height = size.height as usize;
 
+            if first {
+                state = if state.selected().unwrap() > height / 2 {
+                    let idx = state.selected().unwrap() - height / 2;
+                    state.clone().with_offset(idx)
+                } else {
+                    state.clone().with_offset(0)
+                };
+                first = false;
+            }
+
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Length(blame_len as u16 + 1),
+                    Constraint::Length(max_blame_len as u16),
                     Constraint::Min(0),
                 ])
                 .split(f.area());
@@ -169,26 +224,27 @@ pub fn blame_app(
         })?;
 
         if event::poll(std::time::Duration::from_millis(100))? {
-            let event::Event::Key(KeyEvent {
-                code, modifiers, ..
-            }) = event::read()?
-            else {
+            let Event::Key(KeyEvent {
+                kind,
+                code,
+                modifiers,
+                ..
+            }) = event::read()? else {
                 continue;
             };
+            if kind != KeyEventKind::Press {
+                continue;
+            }
 
             if let Some(command) = get_blame_command_to_run(&config, code) {
                 let mut clear = false;
+
                 let idx = state.selected().unwrap();
-                let commit_ref = refs.get(idx).unwrap();
-                let c = ref_to_commit(
-                    &repo,
-                    match commit_ref {
-                        Some(r) => Some(format!("{}^", r)),
-                        _ => Some("HEAD".to_string()),
-                    },
-                );
-                let hash = match c {
-                    Some(commit) => Some(commit.id().to_string()),
+                // TODO: if first commit starts with ^
+                let opt_commit = blames.get(idx).unwrap();
+
+                let hash = match opt_commit {
+                    Some(commit) => Some(commit.hash.clone()),
                     _ => None,
                 };
 
@@ -208,40 +264,44 @@ pub fn blame_app(
                 KeyCode::Char('r') => {
                     reload = true;
                 }
-                KeyCode::Char('l') | KeyCode::Right => {
+                KeyCode::Char('l') => {
                     if revisions.len() == 1 {
                         continue;
                     }
                     revisions.pop();
                     reload = true;
                 }
-                KeyCode::Char('h') | KeyCode::Left => {
+                KeyCode::Char('h') => {
                     let idx = state.selected().unwrap();
-                    let commit_ref = refs.get(idx).unwrap();
-                    let c = ref_to_commit(
-                        &repo,
-                        match commit_ref {
-                            Some(r) => Some(format!("{}^", r)),
-                            _ => Some("HEAD".to_string()),
-                        },
-                    );
-                    // check commit still have lines
-                    if let Some(commit) = c {
-                        revisions.push(Some(commit.id().to_string()));
-                        reload = true;
-                    }
+                    let commit_ref = blames.get(idx).unwrap();
+                    let rev = if let Some(commit) = commit_ref {
+                        if let Some('^') = commit.hash.chars().next() {
+                            continue;
+                        }
+                        format!("{}^", commit.hash)
+                    } else {
+                        "HEAD".to_string()
+                    };
+                    revisions.push(Some(rev.clone()));
+                    reload = true;
                 }
                 KeyCode::Enter => {
                     let idx = state.selected().unwrap();
-                    let commit_ref = refs.get(idx).unwrap();
+                    let commit_ref = blames.get(idx).unwrap();
 
-                    let c = ref_to_commit(&repo, commit_ref.clone());
-                    if let Some(commit) = c {
-                        let rev = Some(commit.id().to_string());
-                        let _ = terminal.clear();
-                        let _ = show_app(&config, terminal, rev);
-                        let _ = terminal.clear();
-                    }
+                    let rev = if let Some(commit) = commit_ref {
+                        if commit.hash.starts_with('^') {
+                            Some(commit.hash[1..].to_string())
+                        } else {
+                            Some(commit.hash.clone())
+                        }
+                    } else {
+                        None
+                    };
+
+                    let _ = terminal.clear();
+                    let _ = show_app(&config, terminal, rev);
+                    let _ = terminal.clear();
                 }
                 _ => (),
             }
