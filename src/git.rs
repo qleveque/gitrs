@@ -44,6 +44,7 @@ pub enum GitOp {
     RmCached,
 }
 
+#[derive(Clone)]
 pub struct GitFile {
     pub unstaged_status: FileStatus,
     pub staged_status: FileStatus,

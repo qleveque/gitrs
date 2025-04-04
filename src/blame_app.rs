@@ -1,11 +1,10 @@
-use crate::config::{get_blame_command_to_run, run_command, Config};
+use crate::config::{get_blame_command_to_run, Config};
 
 use crate::git::{git_blame_output, CommitRef};
-use crate::input::basic_movements;
+use crate::input::InputManager;
 use crate::show_app;
 use crate::ui::style;
 
-use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, StatefulWidget};
@@ -14,7 +13,7 @@ use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style as SyntectStyle, ThemeSet};
 use syntect::parsing::SyntaxSet;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::KeyCode;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -105,8 +104,7 @@ pub fn blame_app(
     let mut reload = true;
     let mut height = 0;
 
-    let mut key_combination = "".to_string();
-    let mut reset_key_combination = true;
+    let mut input_manager = InputManager::new();
 
     // view model
     let mut blame_list = List::default();
@@ -226,99 +224,78 @@ pub fn blame_app(
             StatefulWidget::render(&code_list, chunks[1], f.buffer_mut(), &mut state);
         })?;
 
-        match reset_key_combination {
-            true => key_combination = "".to_string(),
-            false => reset_key_combination = true,
+        if !input_manager.key_pressed()? {
+            continue;
+        }
+        let idx = state.selected().unwrap();
+        // TODO: if first commit starts with ^
+        let opt_commit = blames.get(idx).unwrap();
+
+        let rev = match opt_commit {
+            Some(commit) => Some(commit.hash.clone()),
+            _ => None,
         };
-        if event::poll(std::time::Duration::from_millis(100))? {
-            let Event::Key(KeyEvent {
-                kind,
-                code,
-                modifiers,
-                ..
-            }) = event::read()? else {
-                continue;
-            };
-            if kind != KeyEventKind::Press {
-                continue;
+        let (opt_command, potential) = get_blame_command_to_run(
+            &config,
+            input_manager.key_combination.clone(),
+        );
+        if input_manager.handle_generic_user_input(
+            &mut state,
+            height,
+            &mut quit,
+            opt_command,
+            Some(file.clone()),
+            rev,
+            potential,
+            terminal,
+        )? {
+            continue;
+        }
+
+        match input_manager.key_event.code {
+            KeyCode::Char('r') => {
+                reload = true;
             }
-
-
-            key_combination = format!("{}{}", key_combination, code.to_string());
-            let (opt_command, potential) = get_blame_command_to_run(&config, key_combination.clone());
-            if let Some(command) = opt_command {
-                let mut clear = false;
-
+            KeyCode::Char('l') => {
+                if revisions.len() == 1 {
+                    continue;
+                }
+                revisions.pop();
+                reload = true;
+            }
+            KeyCode::Char('h') => {
                 let idx = state.selected().unwrap();
-                // TODO: if first commit starts with ^
-                let opt_commit = blames.get(idx).unwrap();
-
-                let hash = match opt_commit {
-                    Some(commit) => Some(commit.hash.clone()),
-                    _ => None,
-                };
-
-                run_command(command, &mut quit, &mut clear, Some(file.clone()), hash);
-
-                if clear {
-                    let _ = terminal.clear()?;
-                }
-                continue;
-            } else if !potential {
-                reset_key_combination = true;
-            }
-
-            if basic_movements(code, modifiers, &mut state, height, &mut quit) {
-                continue;
-            }
-
-            match code {
-                KeyCode::Char('r') => {
-                    reload = true;
-                }
-                KeyCode::Char('l') => {
-                    if revisions.len() == 1 {
+                let commit_ref = blames.get(idx).unwrap();
+                let rev = if let Some(commit) = commit_ref {
+                    if let Some('^') = commit.hash.chars().next() {
                         continue;
                     }
-                    revisions.pop();
-                    reload = true;
-                }
-                KeyCode::Char('h') => {
-                    let idx = state.selected().unwrap();
-                    let commit_ref = blames.get(idx).unwrap();
-                    let rev = if let Some(commit) = commit_ref {
-                        if let Some('^') = commit.hash.chars().next() {
-                            continue;
-                        }
-                        format!("{}^", commit.hash)
-                    } else {
-                        "HEAD".to_string()
-                    };
-                    revisions.push(Some(rev.clone()));
-                    reload = true;
-                }
-                KeyCode::Enter => {
-                    let idx = state.selected().unwrap();
-                    let commit_ref = blames.get(idx).unwrap();
-
-                    let rev = if let Some(commit) = commit_ref {
-                        if commit.hash.starts_with('^') {
-                            Some(commit.hash[1..].to_string())
-                        } else {
-                            Some(commit.hash.clone())
-                        }
-                    } else {
-                        None
-                    };
-
-                    let _ = terminal.clear();
-                    let _ = show_app(&config, terminal, rev);
-                    let _ = terminal.clear();
-                }
-                _ => (),
+                    format!("{}^", commit.hash)
+                } else {
+                    "HEAD".to_string()
+                };
+                revisions.push(Some(rev.clone()));
+                reload = true;
             }
+            KeyCode::Enter => {
+                let idx = state.selected().unwrap();
+                let commit_ref = blames.get(idx).unwrap();
 
-            reset_key_combination = false;
+                let rev = if let Some(commit) = commit_ref {
+                    if commit.hash.starts_with('^') {
+                        Some(commit.hash[1..].to_string())
+                    } else {
+                        Some(commit.hash.clone())
+                    }
+                } else {
+                    None
+                };
+
+                let _ = terminal.clear();
+                let _ = show_app(&config, terminal, rev);
+                let _ = terminal.clear();
+            }
+            _ => (),
         }
     }
     Ok(())

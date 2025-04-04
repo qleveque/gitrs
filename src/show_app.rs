@@ -1,14 +1,12 @@
-use crate::config::{get_show_command_to_run, run_command, Config};
+use crate::config::{get_show_command_to_run, Config};
 
 use crate::git::{git_parse_commit, git_show_output, set_git_dir, FileStatus};
-use crate::input::basic_movements;
+use crate::input::InputManager;
 use crate::ui::{display_commit_metadata, style};
 
-use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::Style;
 use ratatui::widgets::{ListState, StatefulWidget, Widget};
 
-use crossterm::event::{self, Event, KeyEventKind};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -31,8 +29,7 @@ pub fn show_app(
     let mut quit = false;
     let mut files_height = 0;
 
-    let mut key_combination = "".to_string();
-    let mut reset_key_combination = true;
+    let mut input_manager = InputManager::new();
 
     let output = git_show_output(&revision, &config); // commit hash
     let mut lines = output.lines().map(String::from);
@@ -84,56 +81,31 @@ pub fn show_app(
         })?;
 
 
-        match reset_key_combination {
-            true => key_combination = "".to_string(),
-            false => reset_key_combination = true,
-        };
-        if event::poll(std::time::Duration::from_millis(100))? {
-            let Event::Key(KeyEvent {
-                kind,
-                code,
-                modifiers,
-                ..
-            }) = event::read()? else {
-                continue;
-            };
-            if kind != KeyEventKind::Press {
-                continue;
-            }
-
-
-            key_combination = format!("{}{}", key_combination, code.to_string());
-            let (opt_command, potential) = get_show_command_to_run(&config, key_combination.clone());
-            if let Some(command) = opt_command {
-                let mut clear = false;
-
-                let file = files[state.selected().unwrap()].1.clone();
-                run_command(
-                    command,
-                    &mut quit,
-                    &mut clear,
-                    Some(file),
-                    Some(commit.hash.clone()),
-                );
-
-                if clear {
-                    let _ = terminal.clear()?;
-                }
-                continue;
-            } else if !potential {
-                reset_key_combination = true;
-            }
-
-            if basic_movements(code, modifiers, &mut state, files_height, &mut quit) {
-                continue;
-            }
-
-            match code {
-                _ => (),
-            }
+        if !input_manager.key_pressed()? {
+            continue;
         }
 
-        reset_key_combination = false;
+        let file = Some(files[state.selected().unwrap()].1.clone());
+        let rev = Some(commit.hash.clone());
+        let (opt_command, potential) = get_show_command_to_run(
+            &config,
+            input_manager.key_combination.clone(),
+        );
+        if input_manager.handle_generic_user_input(
+            &mut state,
+            files_height,
+            &mut quit,
+            opt_command,
+            file,
+            rev,
+            potential,
+            terminal,
+        )? {
+            continue;
+        }
+        match input_manager.key_event.code {
+            _ => (),
+        }
     }
     env::set_current_dir(original_dir).unwrap();
     Ok(())

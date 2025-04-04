@@ -1,18 +1,17 @@
-use crate::input::basic_movements;
+use crate::input::InputManager;
 use crate::{config::Config, git::FileStatus};
 
 use std::collections::HashMap;
 
-use crate::config::{get_status_command_to_run, run_command};
+use crate::config::get_status_command_to_run;
 
 use crate::git::{git_add_restore, git_status_output, GitFile, StagedStatus};
 
-use ratatui::crossterm::event::KeyEvent;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::style::Style;
 use ratatui::widgets::{ListState, Paragraph, StatefulWidget};
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::KeyCode;
 use ratatui::Terminal;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -136,18 +135,16 @@ pub fn status_app(
     let mut staged_table: Vec<(FileStatus, String)> = Vec::new();
     let mut files: HashMap<String, GitFile> = HashMap::new();
     let mut quit = false;
-    let mut hard_quit = false;
     let mut reload = true;
     let mut height = 0;
-
-    let mut key_combination = "".to_string();
-    let mut reset_key_combination = true;
 
     let mut state = ListState::default();
     state.select_first();
     let mut default_state = ListState::default();
 
-    while !quit && !hard_quit {
+    let mut input_manager = InputManager::new();
+
+    while !quit {
         if reload {
             parse_git_status(&mut files, &config);
             compute_tables(&files, &mut unstaged_table, &mut staged_table);
@@ -217,126 +214,92 @@ pub fn status_app(
             );
         })?;
 
-        match reset_key_combination {
-            true => key_combination = "".to_string(),
-            false => reset_key_combination = true,
-        };
+        if !input_manager.key_pressed()? {
+            continue;
+        }
 
-        if event::poll(std::time::Duration::from_millis(100))? {
-            let Event::Key(KeyEvent {
-                kind,
-                code,
-                modifiers,
-                ..
-            }) = event::read()? else {
-                continue;
-            };
-            if kind != KeyEventKind::Press {
-                continue;
-            }
-
-            if empty_tables {
-                match code {
-                    KeyCode::Char('q') | KeyCode::Enter => hard_quit = true,
-                    KeyCode::Char('r') => {
-                        git_add_restore(&mut files, &config, &mut reload);
-                    }
-                    _ => (),
-                }
-                continue;
-            }
-
-            let table = match staged_status {
-                StagedStatus::Staged => &staged_table,
-                StagedStatus::Unstaged => &unstaged_table,
-            };
-            let idx = state.selected().unwrap();
-            let (_, filename) = &table.get(idx).unwrap();
-            let git_file = files.get_mut(filename).unwrap();
-
-            key_combination = format!("{}{}", key_combination, code.to_string());
-            let (opt_command, potential) = get_status_command_to_run(
-                &config,
-                key_combination.clone(),
-                &git_file,
-                staged_status
-            );
-            if let Some(command) = opt_command {
-                git_add_restore(&mut files, &config, &mut reload);
-                let mut clear = false;
-
-                run_command(
-                    command,
-                    &mut hard_quit,
-                    &mut clear,
-                    Some(filename.to_string()),
-                    Some("HEAD".to_string()),
-                );
-
-                if clear {
-                    let _ = terminal.clear()?;
-                }
-                continue;
-            } else if !potential {
-                reset_key_combination = true;
-            }
-            if basic_movements(code, modifiers, &mut state, height, &mut quit) {
-                continue;
-            }
-
-            let table = match staged_status {
-                StagedStatus::Staged => &staged_table,
-                StagedStatus::Unstaged => &unstaged_table,
-            };
-            // TODO: handle properly errors
-            let idx = state.selected().unwrap();
-            let (_, filename) = &table.get(idx).unwrap();
-            let git_file = files.get_mut(filename).unwrap();
-
-            match code {
+        if empty_tables {
+            match input_manager.key_event.code {
+                KeyCode::Char('q') | KeyCode::Enter => quit = true,
                 KeyCode::Char('r') => {
                     git_add_restore(&mut files, &config, &mut reload);
                 }
-                KeyCode::Char('t') => {
-                    toggle_stage_git_file(git_file, staged_status);
-                    compute_tables(&files, &mut unstaged_table, &mut staged_table);
-                }
-                KeyCode::Char('T') => {
-                    for (_, filename) in table {
-                        let git_file = files.get_mut(filename).unwrap();
-                        toggle_stage_git_file(git_file, staged_status);
-                    }
-                    compute_tables(&files, &mut unstaged_table, &mut staged_table);
-                }
-                KeyCode::Tab => {
-                    let other_len = match staged_status {
-                        StagedStatus::Staged => unstaged_table.len(),
-                        StagedStatus::Unstaged => staged_table.len(),
-                    };
-                    if other_len > 0 {
-                        switch_staged_status(&mut staged_status, &mut state);
-                    }
-                }
-                KeyCode::Char('J') => {
-                    if unstaged_table.len() > 0 && staged_status == StagedStatus::Staged {
-                        switch_staged_status(&mut staged_status, &mut state);
-                    }
-                }
-                KeyCode::Char('K') => {
-                    if staged_table.len() > 0 && staged_status == StagedStatus::Unstaged {
-                        switch_staged_status(&mut staged_status, &mut state);
-                    }
-                }
-                KeyCode::Char('q') => {
-                    quit = true;
-                },
                 _ => (),
             }
-            reset_key_combination = false;
+            continue;
+        }
+
+        let table = match staged_status {
+            StagedStatus::Staged => &staged_table,
+            StagedStatus::Unstaged => &unstaged_table,
+        };
+        let idx = state.selected().unwrap();
+        let (_, filename) = &table.get(idx).unwrap();
+        let mut git_file = files.get_mut(filename).unwrap().clone();
+
+        let (opt_command, potential) = get_status_command_to_run(
+            &config,
+            input_manager.key_combination.clone(),
+            &git_file,
+            staged_status,
+        );
+        if opt_command.is_some() {
+            git_add_restore(&mut files, &config, &mut reload);
+        }
+
+        let file = Some(filename.to_string());
+        let rev = Some("HEAD".to_string());
+
+        if input_manager.handle_generic_user_input(
+            &mut state,
+            height,
+            &mut quit,
+            opt_command,
+            file,
+            rev,
+            potential,
+            terminal
+        )? {
+            continue;
+        }
+
+        match input_manager.key_event.code {
+            KeyCode::Char('r') => {
+                git_add_restore(&mut files, &config, &mut reload);
+            }
+            KeyCode::Char('t') => {
+                toggle_stage_git_file(&mut git_file, staged_status);
+                compute_tables(&files, &mut unstaged_table, &mut staged_table);
+            }
+            KeyCode::Char('T') => {
+                for (_, filename) in table {
+                    let mut git_file = files.get_mut(filename).unwrap();
+                    toggle_stage_git_file(&mut git_file, staged_status);
+                }
+                compute_tables(&files, &mut unstaged_table, &mut staged_table);
+            }
+            KeyCode::Tab => {
+                let other_len = match staged_status {
+                    StagedStatus::Staged => unstaged_table.len(),
+                    StagedStatus::Unstaged => staged_table.len(),
+                };
+                if other_len > 0 {
+                    switch_staged_status(&mut staged_status, &mut state);
+                }
+            }
+            KeyCode::Char('J') => {
+                if unstaged_table.len() > 0 && staged_status == StagedStatus::Staged {
+                    switch_staged_status(&mut staged_status, &mut state);
+                }
+            }
+            KeyCode::Char('K') => {
+                if staged_table.len() > 0 && staged_status == StagedStatus::Unstaged {
+                    switch_staged_status(&mut staged_status, &mut state);
+                }
+            }
+            _ => ()
         }
     }
-    if quit {
-        git_add_restore(&mut files, &config, &mut reload);
-    }
+    git_add_restore(&mut files, &config, &mut reload);
     Ok(())
 }
