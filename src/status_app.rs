@@ -235,7 +235,7 @@ pub fn status_app(
         };
         let idx = state.selected().unwrap();
         let (_, filename) = &table.get(idx).unwrap();
-        let mut git_file = files.get_mut(filename).unwrap().clone();
+        let git_file = files.get_mut(filename).unwrap().clone();
 
         let (opt_command, potential) = get_status_command_to_run(
             &config,
@@ -268,6 +268,7 @@ pub fn status_app(
                 git_add_restore(&mut files, &config, &mut reload);
             }
             KeyCode::Char('t') => {
+                let mut git_file = files.get_mut(filename).unwrap();
                 toggle_stage_git_file(&mut git_file, staged_status);
                 compute_tables(&files, &mut unstaged_table, &mut staged_table);
             }

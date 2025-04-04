@@ -3,7 +3,7 @@ use crate::config::{get_blame_command_to_run, Config};
 use crate::git::{git_blame_output, CommitRef};
 use crate::input::InputManager;
 use crate::show_app;
-use crate::ui::style;
+use crate::ui::display_blame_line;
 
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -139,32 +139,13 @@ pub fn blame_app(
                 .iter()
                 .enumerate()
                 .map(|(idx, opt_commit)| {
-                    let display = match opt_commit {
-                        Some(commit) => {
-                            let displayed_hash: String = commit.hash.chars().take(4).collect();
-                            let spans = vec![
-                                Span::styled(displayed_hash, style(Color::Blue)),
-                                Span::raw(" "),
-                                Span::styled(
-                                    format!("{:<max_author_len$}", commit.author.clone()),
-                                    style(Color::Yellow),
-                                ),
-                                Span::raw(" "),
-                                Span::styled(commit.date.clone(), style(Color::Blue)),
-                                Span::raw(" "),
-                                Span::styled(
-                                    format!("{:>max_line_len$}", idx),
-                                    style(Color::Yellow)
-                                ),
-                            ];
-                            let line = Line::from(spans);
-                            if max_blame_len < line.width() {
-                                max_blame_len = line.width()
-                            }
-                            line
-                        },
-                        _ => Line::from("Not Committed Yet".to_string()),
-                    };
+                    let display = display_blame_line(
+                        opt_commit,
+                        idx,
+                        max_author_len,
+                        max_line_len,
+                        &mut max_blame_len,
+                    );
                     ListItem::new(display) // .style(style)
                 })
                 .collect();
