@@ -140,6 +140,9 @@ pub fn status_app(
     let mut reload = true;
     let mut height = 0;
 
+    let mut key_combination = "".to_string();
+    let mut reset_key_combination = true;
+
     let mut state = ListState::default();
     state.select_first();
     let mut default_state = ListState::default();
@@ -214,6 +217,11 @@ pub fn status_app(
             );
         })?;
 
+        match reset_key_combination {
+            true => key_combination = "".to_string(),
+            false => reset_key_combination = true,
+        };
+
         if event::poll(std::time::Duration::from_millis(100))? {
             let Event::Key(KeyEvent {
                 kind,
@@ -246,9 +254,14 @@ pub fn status_app(
             let (_, filename) = &table.get(idx).unwrap();
             let git_file = files.get_mut(filename).unwrap();
 
-            if let Some(command) =
-                get_status_command_to_run(&config, code, &git_file, staged_status)
-            {
+            key_combination = format!("{}{}", key_combination, code.to_string());
+            let (opt_command, potential) = get_status_command_to_run(
+                &config,
+                key_combination.clone(),
+                &git_file,
+                staged_status
+            );
+            if let Some(command) = opt_command {
                 git_add_restore(&mut files, &config, &mut reload);
                 let mut clear = false;
 
@@ -264,6 +277,8 @@ pub fn status_app(
                     let _ = terminal.clear()?;
                 }
                 continue;
+            } else if !potential {
+                reset_key_combination = true;
             }
             if basic_movements(code, modifiers, &mut state, height, &mut quit) {
                 continue;
@@ -317,6 +332,7 @@ pub fn status_app(
                 },
                 _ => (),
             }
+            reset_key_combination = false;
         }
     }
     if quit {

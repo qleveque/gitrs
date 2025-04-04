@@ -73,6 +73,8 @@ map status A >git commit --amend
 map status N >git commit --amend --no-edit
 map untracked D !rm "%(file)"
 map unstaged ! !git restore "%(file)"
+map global yf @echo -n %(file) | xsel --input --clipboard
+map global yc @echo -n %(rev) | xsel --input --clipboard
 ```
 
 ## TODO
@@ -83,7 +85,7 @@ map unstaged ! !git restore "%(file)"
 - [ ] Add the `stash` command
 - [ ] Add the `reflog` command
 - [ ] Add the `branch` command
-- [ ] Allow multiple keystrokes in a command hotkey
+- [x] Allow multiple keystrokes in a command hotkey
 - [ ] Allow the use of modifiers (ctrl/shift) in a command hotkey
 - [ ] Get rid of the gid dependency
 - [ ] Handle renames

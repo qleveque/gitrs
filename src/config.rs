@@ -5,11 +5,9 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crossterm::event::KeyCode;
-
 use crate::git::{FileStatus, GitFile, StagedStatus};
 
-pub type KeyBindings = HashMap<String, HashMap<String, String>>;
+pub type KeyBindings = HashMap<String, Vec<(String, String)>>;
 
 pub struct Config {
     pub scroll_off: usize,
@@ -57,8 +55,8 @@ pub fn parse_gitrs_config() -> Config {
                     config
                         .bindings
                         .entry(mode)
-                        .or_insert_with(HashMap::new)
-                        .insert(key, command);
+                        .or_insert_with(Vec::new)
+                        .push((key, command));
                 }
                 "set" => {
                     let parts: Vec<&str> = line.splitn(3, ' ').collect();
@@ -90,33 +88,35 @@ pub fn parse_gitrs_config() -> Config {
 
 pub fn get_command_to_run(
     config: &Config,
-    key: KeyCode,
+    keys: String,
     fields: &mut Vec<(&str, bool)>,
-) -> Option<String> {
-    let KeyCode::Char(key_char) = key else {
-        return None;
-    };
-
+) -> (Option<String>, bool) {
     fields.push(("global", true));
+    let mut potential = false;
     for field in fields {
         if !field.1 {
             continue;
         }
-        if let Some(mode_map) = config.bindings.get(field.0) {
-            if let Some(command) = mode_map.get(&key_char.to_string()) {
-                return Some(command.clone());
+        if let Some(mode_hotkeys) = config.bindings.get(field.0) {
+            for (key_combination, command) in mode_hotkeys {
+                if *key_combination == keys {
+                    return (Some(command.clone()), false);
+                }
+                if key_combination.starts_with(&keys) {
+                    potential = true;
+                }
             }
         }
     }
-    None
+    (None, potential)
 }
 
 pub fn get_status_command_to_run(
     config: &Config,
-    key: KeyCode,
+    keys: String,
     git_file: &GitFile,
     staged_status: StagedStatus,
-) -> Option<String> {
+) -> (Option<String>, bool) {
     let mut fields: Vec<(&str, bool)> = vec![
         (
             "unmerged",
@@ -131,17 +131,17 @@ pub fn get_status_command_to_run(
         ("unstaged", staged_status == StagedStatus::Unstaged),
         ("status", true),
     ];
-    get_command_to_run(config, key, &mut fields)
+    get_command_to_run(config, keys, &mut fields)
 }
 
-pub fn get_show_command_to_run(config: &Config, key: KeyCode) -> Option<String> {
+pub fn get_show_command_to_run(config: &Config, keys: String) -> (Option<String>, bool) {
     let mut fields: Vec<(&str, bool)> = vec![("show", true)];
-    get_command_to_run(config, key, &mut fields)
+    get_command_to_run(config, keys, &mut fields)
 }
 
-pub fn get_blame_command_to_run(config: &Config, key: KeyCode) -> Option<String> {
+pub fn get_blame_command_to_run(config: &Config, keys: String) -> (Option<String>, bool) {
     let mut fields: Vec<(&str, bool)> = vec![("blame", true)];
-    get_command_to_run(config, key, &mut fields)
+    get_command_to_run(config, keys, &mut fields)
 }
 
 pub fn run_command(

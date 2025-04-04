@@ -105,6 +105,9 @@ pub fn blame_app(
     let mut reload = true;
     let mut height = 0;
 
+    let mut key_combination = "".to_string();
+    let mut reset_key_combination = true;
+
     // view model
     let mut blame_list = List::default();
     let mut code_list = List::default();
@@ -223,6 +226,10 @@ pub fn blame_app(
             StatefulWidget::render(&code_list, chunks[1], f.buffer_mut(), &mut state);
         })?;
 
+        match reset_key_combination {
+            true => key_combination = "".to_string(),
+            false => reset_key_combination = true,
+        };
         if event::poll(std::time::Duration::from_millis(100))? {
             let Event::Key(KeyEvent {
                 kind,
@@ -236,7 +243,10 @@ pub fn blame_app(
                 continue;
             }
 
-            if let Some(command) = get_blame_command_to_run(&config, code) {
+
+            key_combination = format!("{}{}", key_combination, code.to_string());
+            let (opt_command, potential) = get_blame_command_to_run(&config, key_combination.clone());
+            if let Some(command) = opt_command {
                 let mut clear = false;
 
                 let idx = state.selected().unwrap();
@@ -254,6 +264,8 @@ pub fn blame_app(
                     let _ = terminal.clear()?;
                 }
                 continue;
+            } else if !potential {
+                reset_key_combination = true;
             }
 
             if basic_movements(code, modifiers, &mut state, height, &mut quit) {
@@ -305,6 +317,8 @@ pub fn blame_app(
                 }
                 _ => (),
             }
+
+            reset_key_combination = false;
         }
     }
     Ok(())

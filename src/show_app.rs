@@ -31,6 +31,9 @@ pub fn show_app(
     let mut quit = false;
     let mut files_height = 0;
 
+    let mut key_combination = "".to_string();
+    let mut reset_key_combination = true;
+
     let output = git_show_output(&revision, &config); // commit hash
     let mut lines = output.lines().map(String::from);
     let (commit, _) = git_parse_commit(&mut lines);
@@ -80,6 +83,11 @@ pub fn show_app(
             files_height = chunks[1].height as usize;
         })?;
 
+
+        match reset_key_combination {
+            true => key_combination = "".to_string(),
+            false => reset_key_combination = true,
+        };
         if event::poll(std::time::Duration::from_millis(100))? {
             let Event::Key(KeyEvent {
                 kind,
@@ -93,7 +101,10 @@ pub fn show_app(
                 continue;
             }
 
-            if let Some(command) = get_show_command_to_run(&config, code) {
+
+            key_combination = format!("{}{}", key_combination, code.to_string());
+            let (opt_command, potential) = get_show_command_to_run(&config, key_combination.clone());
+            if let Some(command) = opt_command {
                 let mut clear = false;
 
                 let file = files[state.selected().unwrap()].1.clone();
@@ -109,6 +120,8 @@ pub fn show_app(
                     let _ = terminal.clear()?;
                 }
                 continue;
+            } else if !potential {
+                reset_key_combination = true;
             }
 
             if basic_movements(code, modifiers, &mut state, files_height, &mut quit) {
@@ -119,6 +132,8 @@ pub fn show_app(
                 _ => (),
             }
         }
+
+        reset_key_combination = false;
     }
     env::set_current_dir(original_dir).unwrap();
     Ok(())
