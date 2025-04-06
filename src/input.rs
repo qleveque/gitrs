@@ -78,11 +78,15 @@ impl InputManager {
                         false => self.reset_key_combination = true,
                     };
                     self.key_event = key_event;
-                    self.key_combination = format!(
-                        "{}{}",
-                        self.key_combination,
-                        self.key_event.code.to_string()
-                    );
+                    if !self.key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        self.key_combination = format!(
+                            "{}{}",
+                            self.key_combination,
+                            self.key_event.code.to_string()
+                        );
+                    } else {
+                        self.key_combination = "".to_string();
+                    }
                     return Ok(true);
                 }
             }

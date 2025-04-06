@@ -25,8 +25,8 @@ List new/modified/deleted files from the working tree and the staging area.
 + <kbd>t</kbd> Stage/unstage selected file
 + <kbd>T</kbd> Stage/unstage all the files
 + <kbd>Tab</kbd> Switch between untracked and staged column
-+ <kbd>J</kbd>/<kbd>→</kbd> Select staged column
-+ <kbd>K</kbd>/<kbd>←</kbd> Select untracked column
++ <kbd>J</kbd> Select staged column
++ <kbd>K</kbd> Select untracked column
 + <kbd>r</kbd> Reload the view
 
 ### `$ gitrs show [revision]`
@@ -87,7 +87,6 @@ map global yc @echo -n %(rev) | xsel --input --clipboard
 - [ ] Add the `branch` command
 - [x] Allow multiple keystrokes in a command hotkey
 - [ ] Allow the use of modifiers (ctrl/shift) in a command hotkey
-- [ ] Get rid of the gid dependency
 - [ ] Handle renames
 
 ## Credits

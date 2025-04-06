@@ -91,6 +91,9 @@ pub fn get_command_to_run(
     keys: String,
     fields: &mut Vec<(&str, bool)>,
 ) -> (Option<String>, bool) {
+    if keys == "" {
+        return (None, false);
+    }
     fields.push(("global", true));
     let mut potential = false;
     for field in fields {

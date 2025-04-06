@@ -288,12 +288,12 @@ pub fn status_app(
                     switch_staged_status(&mut staged_status, &mut state);
                 }
             }
-            KeyCode::Char('J') => {
+            KeyCode::Char('K') => {
                 if unstaged_table.len() > 0 && staged_status == StagedStatus::Staged {
                     switch_staged_status(&mut staged_status, &mut state);
                 }
             }
-            KeyCode::Char('K') => {
+            KeyCode::Char('J') => {
                 if staged_table.len() > 0 && staged_status == StagedStatus::Unstaged {
                     switch_staged_status(&mut staged_status, &mut state);
                 }
