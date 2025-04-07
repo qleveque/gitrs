@@ -5,7 +5,7 @@ use crate::input::InputManager;
 use crate::show_app;
 use crate::ui::display_blame_line;
 
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, StatefulWidget};
 
@@ -128,12 +128,14 @@ pub fn blame_app(
             blames = new_blames;
             code = new_code;
             let len = blames.len();
-            let max_author_len = blames.iter().map(|opt_commit| {
-                match opt_commit {
+            let max_author_len = blames
+                .iter()
+                .map(|opt_commit| match opt_commit {
                     Some(commit) => commit.author.len(),
                     _ => "Not Committed Yet".len(),
-                }
-            }).max().unwrap();
+                })
+                .max()
+                .unwrap();
             let max_line_len = format!("{}", blames.len()).len();
             let blame_items: Vec<ListItem> = blames
                 .iter()
@@ -152,7 +154,7 @@ pub fn blame_app(
             blame_list = List::new(blame_items)
                 .block(Block::default())
                 .style(Style::default().fg(Color::White))
-                .highlight_style(Style::new().bg(Color::Black))
+                .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
                 .scroll_padding(config.scroll_off);
             let code_items: Vec<ListItem> = highlight_code(&code)
                 .iter()
@@ -163,7 +165,7 @@ pub fn blame_app(
             code_list = List::new(code_items)
                 .block(Block::default().borders(Borders::LEFT))
                 .style(Style::default().fg(Color::White))
-                .highlight_style(Style::new().bg(Color::Black))
+                .highlight_style(Style::new().fg(Color::Black).bg(Color::Gray))
                 .scroll_padding(config.scroll_off);
 
             match state.selected() {
@@ -194,10 +196,7 @@ pub fn blame_app(
 
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(max_blame_len as u16),
-                    Constraint::Min(0),
-                ])
+                .constraints([Constraint::Length(max_blame_len as u16), Constraint::Min(0)])
                 .split(f.area());
 
             StatefulWidget::render(&blame_list, chunks[0], f.buffer_mut(), &mut state);
@@ -216,10 +215,8 @@ pub fn blame_app(
             Some(commit) => Some(commit.hash.clone()),
             _ => None,
         };
-        let (opt_command, potential) = get_blame_command_to_run(
-            &config,
-            input_manager.key_combination.clone(),
-        );
+        let (opt_command, potential) =
+            get_blame_command_to_run(&config, input_manager.key_combination.clone());
         if input_manager.handle_generic_user_input(
             &mut state,
             height,

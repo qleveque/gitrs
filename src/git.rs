@@ -72,11 +72,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn new(
-        metadata: String,
-        files: Vec<(FileStatus, String)>,
-        hash: String,
-    ) -> Self {
+    pub fn new(metadata: String, files: Vec<(FileStatus, String)>, hash: String) -> Self {
         Commit {
             metadata,
             files,
@@ -213,11 +209,7 @@ where
     }
 
     (
-        Commit::new(
-            metadata.join("\n"),
-            files,
-            commit_hash.to_string(),
-        ),
+        Commit::new(metadata.join("\n"), files, commit_hash.to_string()),
         end,
     )
 }

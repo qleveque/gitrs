@@ -72,9 +72,7 @@ pub fn parse_gitrs_config() -> Config {
                                 config.scroll_off = so
                             }
                         }
-                        "git" => {
-                            config.git_exe = value
-                        }
+                        "git" => config.git_exe = value,
                         _ => (),
                     }
                 }

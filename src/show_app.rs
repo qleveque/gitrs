@@ -4,7 +4,7 @@ use crate::git::{git_parse_commit, git_show_output, set_git_dir, FileStatus};
 use crate::input::InputManager;
 use crate::ui::{display_commit_metadata, style};
 
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{ListState, StatefulWidget, Widget};
 
 use ratatui::{
@@ -54,7 +54,7 @@ pub fn show_app(
     let files_list = List::new(file_items)
         .block(Block::default().borders(Borders::NONE))
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::new().bg(Color::Black))
+        .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         .scroll_padding(config.scroll_off);
 
     let metadata = display_commit_metadata(&commit.metadata);
@@ -80,17 +80,14 @@ pub fn show_app(
             files_height = chunks[1].height as usize;
         })?;
 
-
         if !input_manager.key_pressed()? {
             continue;
         }
 
         let file = Some(files[state.selected().unwrap()].1.clone());
         let rev = Some(commit.hash.clone());
-        let (opt_command, potential) = get_show_command_to_run(
-            &config,
-            input_manager.key_combination.clone(),
-        );
+        let (opt_command, potential) =
+            get_show_command_to_run(&config, input_manager.key_combination.clone());
         if input_manager.handle_generic_user_input(
             &mut state,
             files_height,

@@ -258,7 +258,7 @@ pub fn status_app(
             file,
             rev,
             potential,
-            terminal
+            terminal,
         )? {
             continue;
         }
@@ -298,7 +298,7 @@ pub fn status_app(
                     switch_staged_status(&mut staged_status, &mut state);
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
     git_add_restore(&mut files, &config, &mut reload);

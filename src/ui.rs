@@ -45,17 +45,14 @@ pub fn display_blame_line<'a>(
                 Span::raw(" "),
                 Span::styled(commit.date.clone(), style(Color::Blue)),
                 Span::raw(" "),
-                Span::styled(
-                    format!("{:>max_line_len$}", idx),
-                    style(Color::Yellow)
-                ),
+                Span::styled(format!("{:>max_line_len$}", idx), style(Color::Yellow)),
             ];
             let line = Line::from(spans);
             if *max_blame_len < line.width() {
                 *max_blame_len = line.width()
             }
             line
-        },
+        }
         _ => Line::from("Not Committed Yet".to_string()),
     }
 }

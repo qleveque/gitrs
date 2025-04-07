@@ -10,7 +10,7 @@ pub fn basic_movements(
     modifiers: KeyModifiers,
     state: &mut ListState,
     height: usize,
-    quit: &mut bool
+    quit: &mut bool,
 ) -> bool {
     let ctrl = modifiers.contains(KeyModifiers::CONTROL);
     match code {
@@ -111,13 +111,7 @@ impl InputManager {
         }
         if let Some(command) = opt_command {
             let mut clear = false;
-            run_command(
-                command,
-                quit,
-                &mut clear,
-                file,
-                rev,
-            );
+            run_command(command, quit, &mut clear, file, rev);
             if clear {
                 terminal.clear()?;
             }
@@ -128,9 +122,8 @@ impl InputManager {
             self.key_event.modifiers,
             state,
             height,
-            quit
+            quit,
         );
         return Ok(r);
     }
-
 }
