@@ -220,7 +220,7 @@ pub fn status_app(
 
         if empty_tables {
             match input_manager.key_event.code {
-                KeyCode::Char('q') | KeyCode::Enter => quit = true,
+                KeyCode::Char('q') | KeyCode::Enter | KeyCode::Char(' ') => quit = true,
                 KeyCode::Char('r') => {
                     git_add_restore(&mut files, &config, &mut reload);
                 }
@@ -267,12 +267,12 @@ pub fn status_app(
             KeyCode::Char('r') => {
                 git_add_restore(&mut files, &config, &mut reload);
             }
-            KeyCode::Char('t') => {
+            KeyCode::Char('t') | KeyCode::Char(' ') => {
                 let mut git_file = files.get_mut(filename).unwrap();
                 toggle_stage_git_file(&mut git_file, staged_status);
                 compute_tables(&files, &mut unstaged_table, &mut staged_table);
             }
-            KeyCode::Char('T') => {
+            KeyCode::Char('T') | KeyCode::Enter => {
                 for (_, filename) in table {
                     let mut git_file = files.get_mut(filename).unwrap();
                     toggle_stage_git_file(&mut git_file, staged_status);

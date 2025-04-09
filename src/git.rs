@@ -197,8 +197,8 @@ where
                         Some('D') => FileStatus::Deleted,
                         _ => break,
                     };
-                    let filename = &line[2..].to_string();
-                    files.push((status, filename.clone()));
+                    let filename = line.split('\t').nth(1).unwrap().to_string();
+                    files.push((status, filename));
                 }
             }
             None => {

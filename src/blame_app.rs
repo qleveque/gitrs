@@ -255,7 +255,7 @@ pub fn blame_app(
                 revisions.push(Some(rev.clone()));
                 reload = true;
             }
-            KeyCode::Enter => {
+            KeyCode::Enter | KeyCode::Char(' ') => {
                 let idx = state.selected().unwrap();
                 let commit_ref = blames.get(idx).unwrap();
 

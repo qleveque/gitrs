@@ -22,8 +22,8 @@ This is still a work in progress.
 
 List new/modified/deleted files from the working tree and the staging area.
 
-+ <kbd>t</kbd> Stage/unstage selected file
-+ <kbd>T</kbd> Stage/unstage all the files
++ <kbd>t</kbd>/<kbd>Space</kbd> Stage/unstage selected file
++ <kbd>T</kbd>/<kbd>Enter</kbd> Stage/unstage all the files
 + <kbd>Tab</kbd> Switch between untracked and staged column
 + <kbd>J</kbd> Select staged column
 + <kbd>K</kbd> Select untracked column
@@ -37,7 +37,7 @@ Display the list of modified files.
 ### `$ gitrs blame <file> [line]`
 
 Show the blame of the given file.
-+ <kbd>Enter</kbd> Show commit defails
++ <kbd>Enter</kbd>/<kbd>Space</kbd> Show commit defails
 + <kbd>h</kbd>/<kbd>←</kbd> Go to parent blame
 + <kbd>l</kbd>/<kbd>→</kbd> Go back to previous blame
 
