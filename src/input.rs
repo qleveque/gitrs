@@ -110,11 +110,17 @@ impl InputManager {
             return Ok(true);
         }
         if let Some(command) = opt_command {
-            let mut clear = false;
-            run_command(command, quit, &mut clear, file, rev);
-            if clear {
-                terminal.clear()?;
+            let command_type = command.chars().next().unwrap();
+            match command_type {
+                '!' | '>' => terminal.clear()?,
+                _ => (),
             }
+            run_command(command, file, rev);
+            match command_type {
+                '>' => *quit = true,
+                _ => (),
+            }
+
             return Ok(true);
         }
         let r = basic_movements(

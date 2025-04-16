@@ -147,8 +147,6 @@ pub fn get_blame_command_to_run(config: &Config, keys: String) -> (Option<String
 
 pub fn run_command(
     mut command: String,
-    quit: &mut bool,
-    clear: &mut bool,
     filename: Option<String>,
     revision: Option<String>,
 ) {
@@ -175,10 +173,6 @@ pub fn run_command(
         '!' | '>' => {
             let mut child = proc.spawn().expect("Failed to start git commit");
             child.wait().expect("Failed to wait for git commit");
-            if command_type == '>' {
-                *quit = true;
-            }
-            *clear = true;
         }
         _ => (),
     }
