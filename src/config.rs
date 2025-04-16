@@ -5,8 +5,6 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::git::{FileStatus, GitFile, StagedStatus};
-
 pub type KeyBindings = HashMap<String, Vec<(String, String)>>;
 
 pub struct Config {
@@ -112,44 +110,7 @@ pub fn get_command_to_run(
     (None, potential)
 }
 
-pub fn get_status_command_to_run(
-    config: &Config,
-    keys: String,
-    git_file: &GitFile,
-    staged_status: StagedStatus,
-) -> (Option<String>, bool) {
-    let mut fields: Vec<(&str, bool)> = vec![
-        (
-            "unmerged",
-            staged_status == StagedStatus::Unstaged
-                && git_file.unstaged_status == FileStatus::Unmerged,
-        ),
-        (
-            "untracked",
-            staged_status == StagedStatus::Unstaged && git_file.unstaged_status == FileStatus::New,
-        ),
-        ("staged", staged_status == StagedStatus::Staged),
-        ("unstaged", staged_status == StagedStatus::Unstaged),
-        ("status", true),
-    ];
-    get_command_to_run(config, keys, &mut fields)
-}
-
-pub fn get_show_command_to_run(config: &Config, keys: String) -> (Option<String>, bool) {
-    let mut fields: Vec<(&str, bool)> = vec![("show", true)];
-    get_command_to_run(config, keys, &mut fields)
-}
-
-pub fn get_blame_command_to_run(config: &Config, keys: String) -> (Option<String>, bool) {
-    let mut fields: Vec<(&str, bool)> = vec![("blame", true)];
-    get_command_to_run(config, keys, &mut fields)
-}
-
-pub fn run_command(
-    mut command: String,
-    filename: Option<String>,
-    revision: Option<String>,
-) {
+pub fn run_command(mut command: String, filename: Option<String>, revision: Option<String>) {
     let command_type = command.chars().next().unwrap();
     command = command[1..].to_string();
 

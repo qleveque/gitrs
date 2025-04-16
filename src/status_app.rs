@@ -3,7 +3,7 @@ use crate::{config::Config, git::FileStatus};
 
 use std::collections::HashMap;
 
-use crate::config::get_status_command_to_run;
+use crate::config::get_command_to_run;
 
 use crate::git::{git_add_restore, git_status_output, GitFile, StagedStatus};
 
@@ -237,12 +237,24 @@ pub fn status_app(
         let (_, filename) = &table.get(idx).unwrap();
         let git_file = files.get_mut(filename).unwrap().clone();
 
-        let (opt_command, potential) = get_status_command_to_run(
-            &config,
-            input_manager.key_combination.clone(),
-            &git_file,
-            staged_status,
-        );
+        let mut fields: Vec<(&str, bool)> = vec![
+            (
+                "unmerged",
+                staged_status == StagedStatus::Unstaged
+                    && git_file.unstaged_status == FileStatus::Unmerged,
+            ),
+            (
+                "untracked",
+                staged_status == StagedStatus::Unstaged
+                    && git_file.unstaged_status == FileStatus::New,
+            ),
+            ("staged", staged_status == StagedStatus::Staged),
+            ("unstaged", staged_status == StagedStatus::Unstaged),
+            ("status", true),
+        ];
+        let keys = input_manager.key_combination.clone();
+        let (opt_command, potential) = get_command_to_run(config, keys, &mut fields);
+
         if opt_command.is_some() {
             git_add_restore(&mut files, &config, &mut reload);
         }

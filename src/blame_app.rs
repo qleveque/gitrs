@@ -1,4 +1,4 @@
-use crate::config::{get_blame_command_to_run, Config};
+use crate::config::{get_command_to_run, Config};
 
 use crate::git::{git_blame_output, CommitRef};
 use crate::input::InputManager;
@@ -215,8 +215,11 @@ pub fn blame_app(
             Some(commit) => Some(commit.hash.clone()),
             _ => None,
         };
-        let (opt_command, potential) =
-            get_blame_command_to_run(&config, input_manager.key_combination.clone());
+
+        let mut fields: Vec<(&str, bool)> = vec![("blame", true)];
+        let keys = input_manager.key_combination.clone();
+        let (opt_command, potential) = get_command_to_run(config, keys, &mut fields);
+
         if input_manager.handle_generic_user_input(
             &mut state,
             height,
