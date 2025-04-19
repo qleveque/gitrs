@@ -147,6 +147,7 @@ pub fn git_blame_output(file: String, revision: Option<String>, config: &Config)
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
+// TODO: simplify this method
 pub fn git_parse_commit<I>(lines: &mut I) -> (Commit, bool)
 where
     I: Iterator<Item = String>,
@@ -263,7 +264,7 @@ pub fn set_git_dir(config: &Config) {
     env::set_current_dir(repo_root.trim()).expect("Failed to change directory");
 }
 
-pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config, reload: &mut bool) {
+pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
     for op in &[GitOp::Add, GitOp::Restore, GitOp::RmCached] {
         let mut files_to_op: Vec<String> = Vec::new();
         for (filename, git_file) in files.iter() {
@@ -293,5 +294,4 @@ pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config, re
     for (_, git_file) in files {
         git_file.reinit();
     }
-    *reload = true;
 }

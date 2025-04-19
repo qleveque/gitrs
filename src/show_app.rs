@@ -1,12 +1,14 @@
-use crate::config::{get_command_to_run, Config};
+use crate::action::Action;
+use crate::app::GitApp;
+use crate::config::Config;
 
-use crate::git::{git_parse_commit, git_show_output, set_git_dir, FileStatus};
-use crate::input::InputManager;
-use crate::ui::{display_commit_metadata, style};
+use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
 
 use ratatui::style::{Modifier, Style};
-use ratatui::widgets::{ListState, StatefulWidget, Widget};
+use ratatui::text::{Line, Text};
+use ratatui::widgets::{ListState, Paragraph, StatefulWidget, Widget};
 
+use ratatui::Frame;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -15,98 +17,134 @@ use ratatui::{
     Terminal,
 };
 
-use std::{env, io};
+use std::env;
 
-pub fn show_app(
-    config: &Config,
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    revision: Option<String>,
-) -> io::Result<()> {
-    // model
-    let original_dir = env::current_dir().unwrap();
-    set_git_dir(&config);
+pub struct ShowApp {
+    commit: Commit,
+    files: Vec<(FileStatus, String)>,
+    file_list: List<'static>,
+    commit_paragraph: Paragraph<'static>,
+    state: ListState,
+    files_height: usize,
+    original_dir: std::path::PathBuf,
+}
 
-    let mut quit = false;
-    let mut files_height = 0;
+impl ShowApp {
+    pub fn new(config: &Config, revision: Option<String>) -> Self {
+        set_git_dir(config);
 
-    let mut input_manager = InputManager::new();
+        let output = git_show_output(&revision, config);
+        let mut lines = output.lines().map(String::from);
+        let (commit, _) = git_parse_commit(&mut lines);
 
-    let output = git_show_output(&revision, &config); // commit hash
-    let mut lines = output.lines().map(String::from);
-    let (commit, _) = git_parse_commit(&mut lines);
+        let mut files = commit.files.clone();
+        files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
-    let mut files = commit.files.clone();
-    files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        let file_items: Vec<ListItem> = files
+            .iter()
+            .map(|(status, name)| {
+                let label = format!("{} {}", status.character(), name);
+                let color = match status {
+                    FileStatus::New => Color::Green,
+                    FileStatus::Deleted => Color::Red,
+                    FileStatus::Modified => Color::LightBlue,
+                    _ => Color::default(),
+                };
+                ListItem::new(label).style(Style::from(color))
+            })
+            .collect();
 
-    let file_items: Vec<ListItem> = files
-        .iter()
-        .map(|(file_status, filename)| {
-            let label = format!("{} {}", file_status.character(), filename);
-            let color = match file_status {
-                FileStatus::New => Color::Green,
-                FileStatus::Deleted => Color::Red,
-                FileStatus::Modified => Color::LightBlue,
-                _ => Color::default(),
-            };
-            ListItem::new(label).style(style(color))
-        })
-        .collect();
-    let files_list = List::new(file_items)
-        .block(Block::default().borders(Borders::NONE))
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-        .scroll_padding(config.scroll_off);
+        let file_list = List::new(file_items)
+            .block(Block::default().borders(Borders::NONE))
+            .style(Style::from(Color::White))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            .scroll_padding(config.scroll_off);
 
-    let metadata = display_commit_metadata(&commit.metadata);
-    let commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
+        let metadata = Self::display_commit_metadata(commit.metadata.clone());
+        let commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
 
-    let paragraph_len = commit.metadata.lines().count() + 1;
+        let mut state = ListState::default();
+        state.select_first();
 
-    let mut state = ListState::default();
-    state.select_first();
-
-    while !quit {
-        // ui
-        terminal.draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(paragraph_len as u16), // Fixed size for the top layout
-                    Constraint::Min(5), // Minimum size for the bottom layout (5 units)
-                ])
-                .split(f.area());
-            Widget::render(&commit_paragraph, chunks[0], f.buffer_mut());
-            StatefulWidget::render(&files_list, chunks[1], f.buffer_mut(), &mut state);
-            files_height = chunks[1].height as usize;
-        })?;
-
-        if !input_manager.key_pressed()? {
-            continue;
-        }
-
-        let file = Some(files[state.selected().unwrap()].1.clone());
-        let rev = Some(commit.hash.clone());
-
-        let mut fields: Vec<(&str, bool)> = vec![("show", true)];
-        let keys = input_manager.key_combination.clone();
-        let (opt_command, potential) = get_command_to_run(config, keys, &mut fields);
-
-        if input_manager.handle_generic_user_input(
-            &mut state,
-            files_height,
-            &mut quit,
-            opt_command,
-            file,
-            rev,
-            potential,
-            terminal,
-        )? {
-            continue;
-        }
-        match input_manager.key_event.code {
-            _ => (),
-        }
+        return Self {
+            commit,
+            files,
+            file_list,
+            commit_paragraph,
+            state,
+            files_height: 0,
+            original_dir: env::current_dir().unwrap(),
+        };
     }
-    env::set_current_dir(original_dir).unwrap();
-    Ok(())
+
+    fn display_commit_metadata<'b>(metadata: String) -> Paragraph<'b> {
+        let mut lines = metadata.lines();
+
+        let mut styled_lines: Vec<Line<'static>> = Vec::new();
+
+        if let Some(line) = lines.next() {
+            styled_lines.push(Line::styled(line.to_string(), Style::from(Color::Blue)));
+        }
+        if let Some(line) = lines.next() {
+            styled_lines.push(Line::styled(line.to_string(), Style::from(Color::Green)));
+        }
+        if let Some(line) = lines.next() {
+            styled_lines.push(Line::styled(line.to_string(), Style::from(Color::Yellow)));
+        }
+        for line in lines {
+            styled_lines.push(Line::styled(
+                line.to_string(),
+                Style::from(Color::default()),
+            ));
+        }
+
+        Paragraph::new(Text::from(styled_lines))
+    }
+}
+
+impl GitApp for ShowApp {
+    fn on_exit(&mut self) {
+        env::set_current_dir(self.original_dir.clone()).unwrap();
+    }
+
+    fn reload(&mut self) {}
+
+    fn draw(&mut self, frame: &mut Frame) {
+        let paragraph_len = self.commit.metadata.lines().count() + 1;
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(paragraph_len as u16), Constraint::Min(5)])
+            .split(frame.area());
+
+        Widget::render(&self.commit_paragraph, chunks[0], frame.buffer_mut());
+        StatefulWidget::render(
+            &self.file_list,
+            chunks[1],
+            frame.buffer_mut(),
+            &mut self.state,
+        );
+        self.files_height = chunks[1].height as usize;
+    }
+
+    fn get_config_fields(&mut self) -> Vec<(&str, bool)> {
+        vec![("show", true)]
+    }
+
+    fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
+        let file = Some(self.files[self.state.selected().unwrap()].1.clone());
+        let rev = Some(self.commit.hash.clone());
+        (file, rev)
+    }
+
+    fn run_action(
+        &mut self,
+        action: &Action,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    ) -> bool {
+        let mut new_state = self.state.clone();
+        let quit =
+            self.run_generic_action(action, self.files_height, terminal, &mut new_state);
+        self.state = new_state;
+        return quit;
+    }
 }

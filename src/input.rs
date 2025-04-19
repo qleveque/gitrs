@@ -1,57 +1,6 @@
-use std::io;
-
-use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
-use ratatui::{prelude::CrosstermBackend, widgets::ListState, Terminal};
-
-use crate::config::run_command;
-
-pub fn basic_movements(
-    code: KeyCode,
-    modifiers: KeyModifiers,
-    state: &mut ListState,
-    height: usize,
-    quit: &mut bool,
-) -> bool {
-    let ctrl = modifiers.contains(KeyModifiers::CONTROL);
-    match code {
-        KeyCode::Char('k') | KeyCode::Up => {
-            state.select_previous();
-        }
-        KeyCode::Char('j') | KeyCode::Down => {
-            state.select_next();
-        }
-        KeyCode::Char('g') | KeyCode::Home => {
-            state.select_first();
-        }
-        KeyCode::Char('G') | KeyCode::End => {
-            state.select_last();
-        }
-        KeyCode::Char('q') | KeyCode::Backspace => {
-            *quit = true;
-        }
-        KeyCode::Char('d') if ctrl => {
-            state.scroll_down_by(height as u16 / 3);
-        }
-        KeyCode::Char('u') if ctrl => {
-            state.scroll_up_by(height as u16 / 3);
-        }
-        KeyCode::Char('z') => {
-            *state = if state.selected().unwrap() > height / 2 {
-                let idx = state.selected().unwrap() - height / 2;
-                state.clone().with_offset(idx)
-            } else {
-                state.clone().with_offset(0)
-            };
-        }
-        _ => {
-            return false;
-        }
-    }
-    true
-}
+use crossterm::event::{self, KeyCode, KeyEventKind, KeyModifiers};
 
 pub struct InputManager {
-    pub key_event: KeyEvent,
     pub key_combination: String,
     pub reset_key_combination: bool,
 }
@@ -59,12 +8,6 @@ pub struct InputManager {
 impl InputManager {
     pub fn new() -> Self {
         InputManager {
-            key_event: KeyEvent {
-                code: KeyCode::Null,
-                modifiers: KeyModifiers::NONE,
-                kind: KeyEventKind::Release,
-                state: KeyEventState::NONE,
-            },
             key_combination: "".to_string(),
             reset_key_combination: true,
         }
@@ -77,59 +20,32 @@ impl InputManager {
                         true => self.key_combination = "".to_string(),
                         false => self.reset_key_combination = true,
                     };
-                    self.key_event = key_event;
-                    if !self.key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                        self.key_combination = format!(
-                            "{}{}",
-                            self.key_combination,
-                            self.key_event.code.to_string()
-                        );
-                    } else {
-                        self.key_combination = "".to_string();
+                    let mut key_str = match key_event.code {
+                        KeyCode::Up => "up".to_string(),
+                        KeyCode::Down => "down".to_string(),
+                        KeyCode::Right => "right".to_string(),
+                        KeyCode::Left => "left".to_string(),
+                        KeyCode::Enter => "cr".to_string(),
+                        KeyCode::Tab => "tab".to_string(),
+                        KeyCode::Home => "home".to_string(),
+                        KeyCode::End => "end".to_string(),
+                        KeyCode::Esc => "esc".to_string(),
+                        KeyCode::PageUp => "pgup".to_string(),
+                        KeyCode::PageDown => "pgdown".to_string(),
+                        KeyCode::Char(' ') => "space".to_string(),
+                        key_code => key_code.to_string(),
+                    };
+
+                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        key_str = format!("<c-{}>", key_str).to_string();
+                    } else if key_str.len() > 1 {
+                        key_str = format!("<{}>", key_str).to_string();
                     }
+                    self.key_combination = format!("{}{}", self.key_combination, key_str);
                     return Ok(true);
                 }
             }
         }
         return Ok(false);
-    }
-
-    pub fn handle_generic_user_input(
-        &mut self,
-        state: &mut ListState,
-        height: usize,
-        quit: &mut bool,
-        opt_command: Option<String>,
-        file: Option<String>,
-        rev: Option<String>,
-        potential: bool,
-        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> io::Result<bool> {
-        if potential {
-            self.reset_key_combination = false;
-            return Ok(true);
-        }
-        if let Some(command) = opt_command {
-            let command_type = command.chars().next().unwrap();
-            match command_type {
-                '!' | '>' => terminal.clear()?,
-                _ => (),
-            }
-            run_command(command, file, rev);
-            match command_type {
-                '>' => *quit = true,
-                _ => (),
-            }
-
-            return Ok(true);
-        }
-        let r = basic_movements(
-            self.key_event.code,
-            self.key_event.modifiers,
-            state,
-            height,
-            quit,
-        );
-        return Ok(r);
     }
 }

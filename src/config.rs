@@ -2,10 +2,11 @@ use std::{
     collections::HashMap,
     fs,
     io::{BufRead, BufReader},
-    process::{Command, Stdio},
 };
 
-pub type KeyBindings = HashMap<String, Vec<(String, String)>>;
+use crate::action::Action;
+
+pub type KeyBindings = HashMap<String, Vec<(String, Action)>>;
 
 pub struct Config {
     pub scroll_off: usize,
@@ -15,10 +16,57 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
+        let bindings: KeyBindings = [
+            (
+                "global".to_string(),
+                vec![
+                    ("k".to_string(), Action::Up),
+                    ("<up>".to_string(), Action::Up),
+                    ("j".to_string(), Action::Down),
+                    ("<down>".to_string(), Action::Down),
+                    ("r".to_string(), Action::Reload),
+                    ("gg".to_string(), Action::First),
+                    ("<home>".to_string(), Action::First),
+                    ("G".to_string(), Action::Last),
+                    ("<end>".to_string(), Action::Last),
+                    ("q".to_string(), Action::Quit),
+                    ("<esc>".to_string(), Action::Quit),
+                    ("<c-u>".to_string(), Action::HalfPageUp),
+                    ("<pgup>".to_string(), Action::HalfPageUp),
+                    ("<c-d>".to_string(), Action::HalfPageDown),
+                    ("<pgdown>".to_string(), Action::HalfPageDown),
+                    ("zz".to_string(), Action::CenterVertically),
+                ],
+            ),
+            (
+                "status".to_string(),
+                vec![
+                    ("t".to_string(), Action::StageUnstageFile),
+                    ("<space>".to_string(), Action::StageUnstageFile),
+                    ("T".to_string(), Action::StageUnstageFiles),
+                    ("<cr>".to_string(), Action::StageUnstageFiles),
+                    ("<tab>".to_string(), Action::SwitchView),
+                    ("K".to_string(), Action::FocusUnstagedView),
+                    ("J".to_string(), Action::FocusStagedView),
+                ],
+            ),
+            (
+                "blame".to_string(),
+                vec![
+                    ("l".to_string(), Action::NextCommitBlame),
+                    ("<right>".to_string(), Action::NextCommitBlame),
+                    ("h".to_string(), Action::PreviousCommitBlame),
+                    ("<left>".to_string(), Action::PreviousCommitBlame),
+                    ("<cr>".to_string(), Action::ShowCommit),
+                ],
+            ),
+        ]
+        .into_iter()
+        .collect();
         Config {
             scroll_off: 2,
             git_exe: "git".to_string(),
-            bindings: HashMap::new(),
+            bindings,
         }
     }
 }
@@ -48,13 +96,18 @@ pub fn parse_gitrs_config() -> Config {
                     }
                     let mode = parts[1].to_string();
                     let key = parts[2].to_string();
-                    let command = parts[3].to_string();
+                    let action_str = parts[3].to_string();
 
-                    config
-                        .bindings
-                        .entry(mode)
-                        .or_insert_with(Vec::new)
-                        .push((key, command));
+                    match action_str.parse::<Action>() {
+                        Ok(action) => {
+                            config
+                                .bindings
+                                .entry(mode)
+                                .or_insert_with(Vec::new)
+                                .push((key, action));
+                        }
+                        Err(e) => println!("Failed to parse action: {:?}", e),
+                    };
                 }
                 "set" => {
                     let parts: Vec<&str> = line.splitn(3, ' ').collect();
@@ -80,61 +133,4 @@ pub fn parse_gitrs_config() -> Config {
     }
 
     config
-}
-
-pub fn get_command_to_run(
-    config: &Config,
-    keys: String,
-    fields: &mut Vec<(&str, bool)>,
-) -> (Option<String>, bool) {
-    if keys == "" {
-        return (None, false);
-    }
-    fields.push(("global", true));
-    let mut potential = false;
-    for field in fields {
-        if !field.1 {
-            continue;
-        }
-        if let Some(mode_hotkeys) = config.bindings.get(field.0) {
-            for (key_combination, command) in mode_hotkeys {
-                if *key_combination == keys {
-                    return (Some(command.clone()), false);
-                }
-                if key_combination.starts_with(&keys) {
-                    potential = true;
-                }
-            }
-        }
-    }
-    (None, potential)
-}
-
-pub fn run_command(mut command: String, filename: Option<String>, revision: Option<String>) {
-    let command_type = command.chars().next().unwrap();
-    command = command[1..].to_string();
-
-    if let Some(file) = filename {
-        command = command.replace("%(file)", &file);
-    }
-    if let Some(rev) = revision {
-        command = command.replace("%(rev)", &rev);
-    }
-
-    let mut bash_proc = Command::new("bash");
-    let proc = bash_proc.args(["-c", &command]);
-
-    match command_type {
-        '@' => {
-            proc.stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .expect("Failed to execute command");
-        }
-        '!' | '>' => {
-            let mut child = proc.spawn().expect("Failed to start git commit");
-            child.wait().expect("Failed to wait for git commit");
-        }
-        _ => (),
-    }
 }
