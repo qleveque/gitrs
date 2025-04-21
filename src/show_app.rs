@@ -2,6 +2,7 @@ use crate::action::Action;
 use crate::app::GitApp;
 use crate::config::Config;
 
+use crate::errors::Error;
 use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
 
 use ratatui::style::{Modifier, Style};
@@ -30,7 +31,7 @@ pub struct ShowApp {
 }
 
 impl ShowApp {
-    pub fn new(config: &Config, revision: Option<String>) -> Self {
+    pub fn new(config: &Config, revision: Option<String>) -> Result<Self, Error> {
         set_git_dir(config);
 
         let output = git_show_output(&revision, config);
@@ -66,15 +67,16 @@ impl ShowApp {
         let mut state = ListState::default();
         state.select_first();
 
-        return Self {
+        let r = Self {
             commit,
             files,
             file_list,
             commit_paragraph,
             state,
             files_height: 0,
-            original_dir: env::current_dir().unwrap(),
+            original_dir: env::current_dir()?,
         };
+        return Ok(r);
     }
 
     fn display_commit_metadata<'b>(metadata: String) -> Paragraph<'b> {
@@ -103,11 +105,11 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
-    fn on_exit(&mut self) {
-        env::set_current_dir(self.original_dir.clone()).unwrap();
+    fn on_exit(&mut self) -> Result<(), Error> {
+        env::set_current_dir(self.original_dir.clone()).map_err(|_| {
+            Error::GlobalError("could not restore initial working directory".to_string())
+        })
     }
-
-    fn reload(&mut self) {}
 
     fn draw(&mut self, frame: &mut Frame) {
         let paragraph_len = self.commit.metadata.lines().count() + 1;
@@ -131,20 +133,23 @@ impl GitApp for ShowApp {
     }
 
     fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
-        let file = Some(self.files[self.state.selected().unwrap()].1.clone());
+        let filename = self
+            .state
+            .selected()
+            .and_then(|idx| self.files.get(idx))
+            .map(|file| file.1.clone());
         let rev = Some(self.commit.hash.clone());
-        (file, rev)
+        (filename, rev)
     }
 
     fn run_action(
         &mut self,
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let mut new_state = self.state.clone();
-        let quit =
-            self.run_generic_action(action, self.files_height, terminal, &mut new_state);
+        let quit = self.run_generic_action(action, self.files_height, terminal, &mut new_state)?;
         self.state = new_state;
-        return quit;
+        return Ok(quit);
     }
 }

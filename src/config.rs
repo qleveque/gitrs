@@ -4,7 +4,7 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use crate::action::Action;
+use crate::{action::Action, errors::Error};
 
 pub type KeyBindings = HashMap<String, Vec<(String, Action)>>;
 
@@ -71,10 +71,11 @@ impl Default for Config {
     }
 }
 
-pub fn parse_gitrs_config() -> Config {
-    // TODO: better error handling
-    let path = std::env::var("HOME").unwrap() + "/.gitrsrc";
-    let result = fs::File::open(path);
+pub fn parse_gitrs_config() -> Result<Config, Error> {
+    let home = std::env::var("HOME").map_err(|_| {
+        Error::GlobalError("could not read `HOME` environment variable".to_string())
+    })?;
+    let result = fs::File::open(home + "/.gitrsrc");
 
     let mut config: Config = Config::default();
 
@@ -82,7 +83,7 @@ pub fn parse_gitrs_config() -> Config {
         let reader = BufReader::new(file);
 
         for line in reader.lines() {
-            let line = line.unwrap();
+            let line = line?;
             let keyword = line
                 .split_once(' ')
                 .map(|(first, _)| first.to_string())
@@ -98,16 +99,12 @@ pub fn parse_gitrs_config() -> Config {
                     let key = parts[2].to_string();
                     let action_str = parts[3].to_string();
 
-                    match action_str.parse::<Action>() {
-                        Ok(action) => {
-                            config
-                                .bindings
-                                .entry(mode)
-                                .or_insert_with(Vec::new)
-                                .push((key, action));
-                        }
-                        Err(e) => println!("Failed to parse action: {:?}", e),
-                    };
+                    let action = action_str.parse::<Action>()?;
+                    config
+                        .bindings
+                        .entry(mode)
+                        .or_insert_with(Vec::new)
+                        .push((key, action));
                 }
                 "set" => {
                     let parts: Vec<&str> = line.splitn(3, ' ').collect();
@@ -132,5 +129,5 @@ pub fn parse_gitrs_config() -> Config {
         }
     }
 
-    config
+    Ok(config)
 }

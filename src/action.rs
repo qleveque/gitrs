@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use crate::errors::Error;
+
 #[derive(Clone, PartialEq)]
 pub enum CommandType {
     Async,
@@ -30,11 +32,8 @@ pub enum Action {
     None,
 }
 
-#[derive(Debug)]
-pub struct ParseActionError;
-
 impl FromStr for Action {
-    type Err = ParseActionError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -61,7 +60,7 @@ impl FromStr for Action {
                     Some('!') => CommandType::Sync,
                     Some('>') => CommandType::SyncQuit,
                     Some('@') => CommandType::Async,
-                    _ => return Err(ParseActionError),
+                    _ => return Err(Error::ParseActionError(cmd.to_string())),
                 };
 
                 Ok(Action::Command(command_type, cmd[1..].to_string()))

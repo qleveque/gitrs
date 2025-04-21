@@ -1,5 +1,7 @@
 use crossterm::event::{self, KeyCode, KeyEventKind, KeyModifiers};
 
+use crate::errors::Error;
+
 pub struct InputManager {
     pub key_combination: String,
     pub reset_key_combination: bool,
@@ -12,7 +14,7 @@ impl InputManager {
             reset_key_combination: true,
         }
     }
-    pub fn key_pressed(&mut self) -> Result<bool, std::io::Error> {
+    pub fn key_pressed(&mut self) -> Result<bool, Error> {
         if event::poll(std::time::Duration::from_millis(100))? {
             if let event::Event::Key(key_event) = event::read()? {
                 if key_event.kind == KeyEventKind::Press {

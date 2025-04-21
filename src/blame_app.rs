@@ -2,6 +2,7 @@ use crate::action::Action;
 use crate::app::GitApp;
 use crate::config::Config;
 
+use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
 use crate::show_app::ShowApp;
 
@@ -21,8 +22,8 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
     Terminal,
 };
+use syntect::util::LinesWithEndings;
 
-use std::io::{self, ErrorKind};
 use std::path::Path;
 
 pub struct BlameApp<'a> {
@@ -35,7 +36,6 @@ pub struct BlameApp<'a> {
     state: ListState,
     max_blame_len: usize,
     revisions: Vec<Option<String>>,
-    first: bool,
     config: &'a Config,
 }
 
@@ -45,11 +45,10 @@ impl<'a> BlameApp<'a> {
         file: String,
         revision: Option<String>,
         line: usize,
-    ) -> Result<Self, io::Error> {
+    ) -> Result<Self, Error> {
         if !Path::new(&file).exists() {
-            return Err(io::Error::new(
-                ErrorKind::NotFound,
-                format!("error: file '{}' does not exist", file),
+            return Err(Error::GlobalError(
+                format!("file '{}' does not exist", file).to_string(),
             ));
         }
         let mut state = ListState::default();
@@ -65,44 +64,53 @@ impl<'a> BlameApp<'a> {
             state,
             max_blame_len: 0,
             revisions,
-            first: true,
             config,
         };
-        instance.reload();
+        instance.reload()?;
         Ok(instance)
     }
 
-    fn highlighted_lines(&self) -> Vec<Line<'a>> {
+    fn highlighted_lines(&self) -> Result<Vec<Line<'a>>, Error> {
         let ps = SyntaxSet::load_defaults_newlines();
         let ts = ThemeSet::load_defaults();
-        let syntax = ps.find_syntax_by_extension("rs").unwrap();
-        let mut h = HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]);
+        let theme = &ts.themes["base16-ocean.dark"];
 
-        self.code
-            .iter()
-            .map(|line| {
-                let ranges: Vec<(SyntectStyle, String)> = h
-                    .highlight_line(&line, &ps)
-                    .unwrap()
-                    .into_iter()
-                    .map(|(style, text)| (style, text.to_string())) // Convert &str to owned String
-                    .collect();
-                let spans: Vec<Span> = ranges
-                    .into_iter()
-                    .map(|(style, text)| {
-                        Span::styled(
-                            text, // Now owns the string
-                            Style::default().fg(Color::Rgb(
-                                style.foreground.r,
-                                style.foreground.g,
-                                style.foreground.b,
-                            )),
-                        )
-                    })
-                    .collect();
-                Line::from(spans)
-            })
-            .collect()
+        let file_text = self.code.join("\n");
+        let path = Path::new(&self.file);
+        let syntax = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .and_then(|ext| ps.find_syntax_by_extension(ext))
+            .unwrap_or_else(|| {
+                ps.find_syntax_by_first_line(&file_text)
+                    .unwrap_or_else(|| ps.find_syntax_plain_text())
+            });
+        let mut h = HighlightLines::new(syntax, theme);
+
+        let mut lines: Vec<Line> = Vec::new();
+
+        for line in LinesWithEndings::from(&file_text) {
+            let ranges: Vec<(SyntectStyle, String)> = h
+                .highlight_line(&line, &ps)?
+                .into_iter()
+                .map(|(style, text)| (style, text.to_string())) // Convert &str to owned String
+                .collect();
+            let spans: Vec<Span> = ranges
+                .into_iter()
+                .map(|(style, text)| {
+                    Span::styled(
+                        text,
+                        Style::default().fg(Color::Rgb(
+                            style.foreground.r,
+                            style.foreground.g,
+                            style.foreground.b,
+                        )),
+                    )
+                })
+                .collect();
+            lines.push(Line::from(spans));
+        }
+        Ok(lines)
     }
 
     fn displayed_blame_line(
@@ -140,17 +148,19 @@ impl<'a> BlameApp<'a> {
         file: String,
         revision: Option<String>,
         config: &Config,
-    ) -> (Vec<Option<CommitRef>>, Vec<String>) {
+    ) -> Result<(Vec<Option<CommitRef>>, Vec<String>), Error> {
         let output = git_blame_output(file, revision.clone(), config);
 
         let mut blame_column = Vec::new();
         let mut code_column = Vec::new();
 
         for line in output.lines() {
-            let (blame, code) = line.split_once(')').unwrap();
+            let (blame, code) = line.split_once(')').ok_or_else(|| Error::GitParsingError)?;
             code_column.push(code.to_string());
             let blame_text = blame.to_string() + ")";
-            let (hash, blame_text) = blame_text.split_once(" (").unwrap();
+            let (hash, blame_text) = blame_text
+                .split_once(" (")
+                .ok_or_else(|| Error::GitParsingError)?;
             // for initial commit
             blame_column.push(if hash.starts_with("0000") {
                 None
@@ -166,20 +176,21 @@ impl<'a> BlameApp<'a> {
             });
         }
 
-        (blame_column, code_column)
+        Ok((blame_column, code_column))
     }
 }
 
 impl GitApp for BlameApp<'_> {
-    fn reload(&mut self) {
-        let (new_blames, new_code) = BlameApp::parse_git_blame(
-            self.file.clone(),
-            self.revisions.last().unwrap().clone(),
-            &self.config,
-        );
+    fn reload(&mut self) -> Result<(), Error> {
+        let revision = self
+            .revisions
+            .last()
+            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?;
+        let (new_blames, new_code) =
+            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.config)?;
         if new_blames.len() == 0 {
             self.revisions.pop();
-            return;
+            return Ok(());
         }
         self.blames = new_blames;
         self.code = new_code;
@@ -192,7 +203,7 @@ impl GitApp for BlameApp<'_> {
                 _ => "Not Committed Yet".len(),
             })
             .max()
-            .unwrap();
+            .unwrap_or(0);
         let max_line_len = format!("{}", self.blames.len()).len();
 
         let mut max_blame_len = 0;
@@ -216,7 +227,7 @@ impl GitApp for BlameApp<'_> {
             .scroll_padding(self.config.scroll_off);
 
         let code_items: Vec<ListItem> = self
-            .highlighted_lines()
+            .highlighted_lines()?
             .iter()
             .map(|line| ListItem::new(line.clone()))
             .collect();
@@ -234,21 +245,12 @@ impl GitApp for BlameApp<'_> {
                 }
             }
         }
+        Ok(())
     }
 
     fn draw(&mut self, frame: &mut Frame) {
         let size = frame.area();
         self.height = size.height as usize;
-
-        if self.first {
-            self.state = if self.state.selected().unwrap() > self.height / 2 {
-                let idx = self.state.selected().unwrap() - self.height / 2;
-                self.state.clone().with_offset(idx)
-            } else {
-                self.state.clone().with_offset(0)
-            };
-            self.first = false;
-        }
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -278,13 +280,11 @@ impl GitApp for BlameApp<'_> {
     }
 
     fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
-        let idx = self.state.selected().unwrap();
-        // TODO: if first commit starts with ^
-        let opt_commit = self.blames.get(idx).unwrap();
-        let rev = match opt_commit {
-            Some(commit) => Some(commit.hash.clone()),
-            _ => None,
-        };
+        let rev = self
+            .state
+            .selected()
+            .and_then(|idx| self.blames.get(idx))
+            .and_then(|opt_commit| opt_commit.as_ref().map(|commit| commit.hash.clone()));
         (Some(self.file.clone()), rev)
     }
 
@@ -292,56 +292,58 @@ impl GitApp for BlameApp<'_> {
         &mut self,
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         match action {
             Action::NextCommitBlame => {
                 if self.revisions.len() == 1 {
-                    return false;
+                    return Ok(false);
                 }
                 self.revisions.pop();
-                self.reload();
+                self.reload()?;
             }
             Action::PreviousCommitBlame => {
-                let idx = self.state.selected().unwrap();
-                let commit_ref = self.blames.get(idx).unwrap();
+                let idx = self
+                    .state
+                    .selected()
+                    .ok_or_else(|| Error::StateIndexError)?;
+                let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
                 let rev = if let Some(commit) = commit_ref {
                     if let Some('^') = commit.hash.chars().next() {
-                        return false;
+                        return Ok(false);
                     }
                     format!("{}^", commit.hash)
                 } else {
                     "HEAD".to_string()
                 };
                 self.revisions.push(Some(rev.clone()));
-                self.reload();
+                self.reload()?;
             }
             Action::ShowCommit => {
-                let idx = self.state.selected().unwrap();
-                let commit_ref = self.blames.get(idx).unwrap();
+                let commit_ref = self
+                    .state
+                    .selected()
+                    .and_then(|idx| self.blames.get(idx))
+                    .and_then(|opt| opt.as_ref());
 
-                let rev = if let Some(commit) = commit_ref {
-                    if commit.hash.starts_with('^') {
+                if let Some(commit) = commit_ref {
+                    let rev = if commit.hash.starts_with('^') {
                         Some(commit.hash[1..].to_string())
                     } else {
                         Some(commit.hash.clone())
-                    }
-                } else {
-                    None
+                    };
+                    terminal.clear()?;
+                    ShowApp::new(&self.config, rev)?.run(terminal, self.config)?;
+                    terminal.clear()?;
                 };
-
-                let _ = terminal.clear();
-                let mut app = ShowApp::new(&self.config, rev);
-                let _ = app.run(terminal, self.config);
-                let _ = terminal.clear();
             }
             _ => {
                 let mut new_state = self.state.clone();
                 let quit =
-                    self.run_generic_action(action, self.height, terminal, &mut new_state);
+                    self.run_generic_action(action, self.height, terminal, &mut new_state)?;
                 self.state = new_state;
-                return quit;
+                return Ok(quit);
             }
         };
-        return false;
+        return Ok(false);
     }
 }

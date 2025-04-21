@@ -1,11 +1,8 @@
-extern crate crossterm;
-extern crate ratatui;
-extern crate syntect;
-
 mod action;
 mod app;
 mod blame_app;
 mod config;
+mod errors;
 mod git;
 mod input;
 mod show_app;
@@ -18,6 +15,7 @@ use clap::{Parser, Subcommand};
 
 use config::parse_gitrs_config;
 
+use errors::Error;
 use show_app::ShowApp;
 use status_app::StatusApp;
 
@@ -60,30 +58,39 @@ enum Commands {
     },
 }
 
-fn main() -> io::Result<()> {
+fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Error> {
+    let config = parse_gitrs_config()?;
     let cli = Cli::parse();
-    let config = parse_gitrs_config();
+    let _ = match cli.command {
+        Commands::Status => StatusApp::new(&config)?.run(terminal, &config),
+        Commands::Blame { file, line } => {
+            BlameApp::new(&config, file, None, line)?.run(terminal, &config)
+        }
+        Commands::Show { revision } => ShowApp::new(&config, revision)?.run(terminal, &config),
+    };
 
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+    disable_raw_mode()?;
+    Ok(())
+}
+
+fn main() -> io::Result<()> {
     enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let ret = match cli.command {
-        Commands::Status => StatusApp::new(&config).run(&mut terminal, &config),
-        Commands::Blame { file, line } => {
-            BlameApp::new(&config, file, None, line)?.run(&mut terminal, &config)
-        }
-        Commands::Show { revision } => ShowApp::new(&config, revision).run(&mut terminal, &config),
-    };
+    let ret = app(&mut terminal);
 
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     disable_raw_mode()?;
+
     if let Err(err) = ret {
         eprintln!("{} {}", "error:".red().bold(), err.to_string().white());
         std::process::exit(1);
     }
-    ret
+    Ok(())
 }

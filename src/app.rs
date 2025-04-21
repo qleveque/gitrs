@@ -1,20 +1,23 @@
-use std::{
-    io,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 
 use ratatui::{prelude::CrosstermBackend, widgets::ListState, Frame, Terminal};
 
 use crate::{
     action::{Action, CommandType},
     config::Config,
+    errors::Error,
     input::InputManager,
 };
 
 pub trait GitApp {
-    fn reload(&mut self);
     fn draw(&mut self, frame: &mut Frame);
-    fn on_exit(&mut self) {}
+
+    fn on_exit(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+    fn reload(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 
     fn get_config_fields(&mut self) -> Vec<(&str, bool)>;
     fn get_file_and_rev(&self) -> (Option<String>, Option<String>);
@@ -23,27 +26,27 @@ pub trait GitApp {
         &mut self,
         action: &Action,
         _terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> bool;
+    ) -> Result<bool, Error>;
 
     fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         config: &Config,
-    ) -> io::Result<()> {
+    ) -> Result<(), Error> {
         let mut input_manager = InputManager::new();
         loop {
             let _ = terminal.draw(|f| {
                 self.draw(f);
             });
-            let opt_action = self.read_user_action(&mut input_manager, config);
+            let opt_action = self.read_user_action(&mut input_manager, config)?;
             if let Some(action) = opt_action {
-                let quit = self.run_action(&action, terminal);
+                let quit = self.run_action(&action, terminal)?;
                 if quit {
                     break;
                 }
             }
         }
-        self.on_exit();
+        self.on_exit()?;
         Ok(())
     }
 
@@ -53,10 +56,10 @@ pub trait GitApp {
         height: usize,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         state: &mut ListState,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let mut quit = false;
         match action {
-            Action::Reload => self.reload(),
+            Action::Reload => self.reload()?,
             Action::Up => state.select_previous(),
             Action::Down => state.select_next(),
             Action::First => state.select_first(),
@@ -65,8 +68,9 @@ pub trait GitApp {
             Action::HalfPageUp => state.scroll_up_by(height as u16 / 3),
             Action::HalfPageDown => state.scroll_down_by(height as u16 / 3),
             Action::CenterVertically => {
-                *state = if state.selected().unwrap() > height / 2 {
-                    let idx = state.selected().unwrap() - height / 2;
+                let mut idx = state.selected().ok_or_else(|| Error::StateIndexError)?;
+                *state = if idx > height / 2 {
+                    idx = idx - height / 2;
                     state.clone().with_offset(idx)
                 } else {
                     state.clone().with_offset(0)
@@ -75,15 +79,15 @@ pub trait GitApp {
             Action::Command(command_type, command) => {
                 //TODO: remove unwrap
                 match command_type {
-                    CommandType::Sync | CommandType::SyncQuit => terminal.clear().unwrap(),
+                    CommandType::Sync | CommandType::SyncQuit => terminal.clear()?,
                     _ => (),
                 }
                 let (file, rev) = self.get_file_and_rev();
                 // TODO: improve
-                self.reload();
+                self.reload()?;
                 Self::run_command(&command_type, command.to_string(), file, rev);
                 // TODO: improve
-                self.reload();
+                self.reload()?;
                 match command_type {
                     CommandType::SyncQuit => quit = true,
                     _ => (),
@@ -94,23 +98,23 @@ pub trait GitApp {
                 println!("Unknown command in this context");
             }
         }
-        return quit;
+        return Ok(quit);
     }
 
     fn read_user_action(
         &mut self,
         input_manager: &mut InputManager,
         config: &Config,
-    ) -> Option<Action> {
+    ) -> Result<Option<Action>, Error> {
         // TODO: unwrap
-        if !input_manager.key_pressed().unwrap() {
-            return None;
+        if !input_manager.key_pressed()? {
+            return Ok(None);
         }
 
         // Compute command to run from config
         let keys = input_manager.key_combination.clone();
         if keys == "" {
-            return None;
+            return Ok(None);
         }
         for field in [self.get_config_fields().as_slice(), &[("global", true)]].concat() {
             if !field.1 {
@@ -122,7 +126,7 @@ pub trait GitApp {
                         continue;
                     }
                     if *key_combination == keys {
-                        return Some(action.clone());
+                        return Ok(Some(action.clone()));
                     }
                     if key_combination.starts_with(&keys) {
                         input_manager.reset_key_combination = false;
@@ -130,7 +134,7 @@ pub trait GitApp {
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     fn run_command(
