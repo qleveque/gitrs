@@ -19,6 +19,8 @@ pub struct AppState {
     pub config: Config,
     pub notif: Option<Notif>,
     pub key_combination: String,
+    pub search_string: String,
+    pub is_searching: bool,
 }
 
 impl AppState {
@@ -28,6 +30,8 @@ impl AppState {
             config: parse_gitrs_config()?,
             notif: None,
             key_combination: "".to_string(),
+            search_string: "".to_string(),
+            is_searching: false,
         };
         return Ok(r);
     }

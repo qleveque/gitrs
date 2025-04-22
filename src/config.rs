@@ -36,6 +36,8 @@ impl Default for Config {
                     ("<c-d>".to_string(), Action::HalfPageDown),
                     ("<pgdown>".to_string(), Action::HalfPageDown),
                     ("zz".to_string(), Action::CenterVertically),
+                    ("/".to_string(), Action::Search),
+                    ("<c-f>".to_string(), Action::Search),
                 ],
             ),
             (

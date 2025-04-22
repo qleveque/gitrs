@@ -1,6 +1,9 @@
 use std::process::{Command, Stdio};
 
-use crossterm::{event::{self, KeyCode, KeyEventKind, KeyModifiers}, terminal::{disable_raw_mode, enable_raw_mode}};
+use crossterm::{
+    event::{self, KeyCode, KeyEventKind, KeyModifiers},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::CrosstermBackend,
@@ -55,17 +58,35 @@ pub trait GitApp {
         enable_raw_mode()?;
 
         loop {
-
             terminal.draw(|frame| {
                 let mut chunk = frame.area();
+
+                if self.get_state().is_searching || !self.get_state().search_string.is_empty() {
+                    let mut searched_string = self.get_state().search_string.clone();
+                    if self.get_state().is_searching {
+                        searched_string.push_str("│")
+                    }
+                    let paragraph = Paragraph::new(searched_string)
+                        .block(Block::default().borders(Borders::TOP).title("Search"));
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Min(0), Constraint::Length(2)])
+                        .split(chunk);
+                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+                    chunk = chunks[0];
+                } 
 
                 if let Some(notif) = self.get_state().notif.clone() {
                     let style = match notif.notif_type {
                         NotifType::Info => Style::from(Color::Blue),
                         NotifType::Error => Style::from(Color::Red),
                     };
+                    let title = match notif.notif_type {
+                        NotifType::Info => "Info",
+                        NotifType::Error => "Error",
+                    };
                     let paragraph = Paragraph::new(&*notif.message)
-                        .block(Block::default().borders(Borders::TOP))
+                        .block(Block::default().borders(Borders::TOP).title(title))
                         .style(style);
 
                     let chunks = Layout::default()
@@ -75,12 +96,11 @@ pub trait GitApp {
                     Widget::render(&paragraph, chunks[1], frame.buffer_mut());
                     chunk = chunks[0];
                 }
+
                 self.draw(frame, chunk);
             })?;
 
-            self.get_state().notif = None;
-
-            let opt_action = self.get_user_action()?;
+            let opt_action = self.handle_user_input()?;
             if let Some(action) = opt_action {
                 self.get_state().key_combination = "".to_string();
                 match self.run_action(&action, terminal) {
@@ -91,8 +111,10 @@ pub trait GitApp {
                     break;
                 }
             }
+
+            // display key combination if multiple letters
             let key_combination = self.get_state().key_combination.clone();
-            if self.get_state().notif.is_none() && !key_combination.is_empty(){
+            if self.get_state().notif.is_none() && !key_combination.is_empty() {
                 self.info(&key_combination);
             }
         }
@@ -103,11 +125,36 @@ pub trait GitApp {
         Ok(())
     }
 
-
     fn key_pressed(&mut self) -> Result<bool, Error> {
         if event::poll(std::time::Duration::from_millis(100))? {
             if let event::Event::Key(key_event) = event::read()? {
                 if key_event.kind == KeyEventKind::Press {
+
+                    if self.get_state().is_searching {
+
+                        match key_event.code {
+                            KeyCode::Enter => {
+                                self.get_state().is_searching = false;
+                            },
+                            KeyCode::Esc => {
+                                self.get_state().is_searching = false;
+                                self.get_state().search_string = "".to_string();
+                            },
+                            KeyCode::Backspace => {
+                                self.get_state().search_string.pop();
+                            },
+                            KeyCode::Char(char) => {
+                                self.get_state().search_string.push(char);
+                            },
+                            _ => {
+                                self.error("error: this char is not handled yet");
+                                return Ok(false);
+                            }
+                        }
+                        self.get_state().notif = None;
+                        return Ok(false);
+                    }
+
                     let mut key_str = match key_event.code {
                         KeyCode::Up => "up".to_string(),
                         KeyCode::Down => "down".to_string(),
@@ -129,11 +176,7 @@ pub trait GitApp {
                     } else if key_str.len() > 1 {
                         key_str = format!("<{}>", key_str).to_string();
                     }
-                    self.get_state().key_combination = format!(
-                        "{}{}",
-                        self.get_state().key_combination,
-                        key_str,
-                    );
+                    self.get_state().key_combination.push_str(&key_str);
                     return Ok(true);
                 }
             }
@@ -179,23 +222,26 @@ pub trait GitApp {
                     _ => (),
                 }
             }
+            Action::Search => {
+                self.get_state().is_searching = true;
+            }
             Action::None => (),
             action => {
-                return Err(Error::GlobalError(
-                    format!("cannot run `{:?}` in this context", action)
-                ));
+                return Err(Error::GlobalError(format!(
+                    "cannot run `{:?}` in this context",
+                    action
+                )));
             }
         }
         Ok(())
     }
 
-    fn get_user_action(
-        &mut self,
-    ) -> Result<Option<Action>, Error> {
+    fn handle_user_input(&mut self) -> Result<Option<Action>, Error> {
         // TODO: unwrap
         if !self.key_pressed()? {
             return Ok(None);
         }
+        self.get_state().notif = None;
 
         // Compute command to run from config
         let keys = self.get_state().key_combination.clone();

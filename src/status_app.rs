@@ -119,7 +119,7 @@ fn list_to_draw<'a>(
         })
         .collect();
     return List::new(r)
-        .block(Block::default().title(title).borders(Borders::ALL))
+        .block(Block::default().title(title).borders(Borders::TOP))
         .style(Style::from(Color::White))
         .highlight_style(Style::from(Color::Black).bg(color))
         .scroll_padding(config.scroll_off);
