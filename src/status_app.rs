@@ -1,5 +1,6 @@
 use crate::action::Action;
 use crate::app::GitApp;
+use crate::app_state::AppState;
 use crate::errors::Error;
 use crate::{config::Config, git::FileStatus};
 
@@ -123,7 +124,8 @@ fn list_to_draw<'a>(
         .scroll_padding(config.scroll_off);
 }
 
-pub struct StatusApp<'a> {
+pub struct StatusApp {
+    app_state: AppState,
     staged_status: StagedStatus,
     unstaged_table: Vec<(FileStatus, String)>,
     staged_table: Vec<(FileStatus, String)>,
@@ -131,14 +133,14 @@ pub struct StatusApp<'a> {
     height: usize,
     state: ListState,
     default_state: ListState,
-    config: &'a Config,
 }
 
-impl<'a> StatusApp<'a> {
-    pub fn new(config: &'a Config) -> Result<Self, Error> {
+impl StatusApp {
+    pub fn new() -> Result<Self, Error> {
         let mut state = ListState::default();
         state.select_first();
         let mut instance = Self {
+            app_state: AppState::new()?,
             staged_status: StagedStatus::Unstaged, // TODO: should be staged if unstaged empty
             unstaged_table: Vec::new(),
             staged_table: Vec::new(),
@@ -146,7 +148,6 @@ impl<'a> StatusApp<'a> {
             height: 0,
             state,
             default_state: ListState::default(),
-            config,
         };
         instance.reload()?;
         Ok(instance)
@@ -184,10 +185,14 @@ impl<'a> StatusApp<'a> {
     }
 }
 
-impl GitApp for StatusApp<'_> {
+impl GitApp for StatusApp {
+    fn get_state(&mut self) -> &mut AppState {
+        &mut self.app_state
+    }
+
     fn reload(&mut self) -> Result<(), Error> {
-        git_add_restore(&mut self.git_files, &self.config);
-        parse_git_status(&mut self.git_files, &self.config)?;
+        git_add_restore(&mut self.git_files, &self.app_state.config);
+        parse_git_status(&mut self.git_files, &self.app_state.config)?;
         compute_tables(
             &self.git_files,
             &mut self.unstaged_table,
@@ -197,7 +202,7 @@ impl GitApp for StatusApp<'_> {
     }
 
     fn on_exit(&mut self) -> Result<(), Error> {
-        git_add_restore(&mut self.git_files, &self.config);
+        git_add_restore(&mut self.git_files, &self.app_state.config);
         Ok(())
     }
 
@@ -221,7 +226,7 @@ impl GitApp for StatusApp<'_> {
             chunks[0].width as usize,
             Color::Red,
             "Not staged:".to_string(),
-            &self.config,
+            &self.app_state.config,
         );
         StatefulWidget::render(
             &left_list,
@@ -238,7 +243,7 @@ impl GitApp for StatusApp<'_> {
             chunks[1].width as usize,
             Color::Green,
             "Staged:".to_string(),
-            &self.config,
+            &self.app_state.config,
         );
         StatefulWidget::render(
             &right_list,
@@ -251,7 +256,7 @@ impl GitApp for StatusApp<'_> {
         );
     }
 
-    fn get_config_fields(&mut self) -> Vec<(&str, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
         let git_file = match self.get_mut_git_file() {
             Ok(git_file) => git_file,
             Err(_) => return vec![("status", true)],
@@ -286,16 +291,15 @@ impl GitApp for StatusApp<'_> {
         &mut self,
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> Result<bool, Error> {
-        let mut quit = false;
+    ) -> Result<(), Error> {
 
         if self.tables_are_empty() {
             match action {
-                Action::Quit | Action::StageUnstageFile | Action::StageUnstageFiles => quit = true,
+                Action::Quit | Action::StageUnstageFile | Action::StageUnstageFiles => self.app_state.quit = true,
                 Action::Reload => self.reload()?,
                 _ => (),
             }
-            return Ok(quit);
+            return Ok(());
         }
 
         match action {
@@ -346,13 +350,13 @@ impl GitApp for StatusApp<'_> {
             }
             _ => {
                 let mut new_state = self.state.clone();
-                quit = self.run_generic_action(action, self.height, terminal, &mut new_state)?;
+                self.run_generic_action(action, self.height, terminal, &mut new_state)?;
                 self.state = new_state;
             }
         }
         if !self.tables_are_empty() && 0 == self.get_current_table().len() {
             switch_staged_status(&mut self.staged_status, &mut self.state);
         }
-        return Ok(quit);
+        return Ok(());
     }
 }

@@ -1,6 +1,6 @@
 use crate::action::Action;
 use crate::app::GitApp;
-use crate::config::Config;
+use crate::app_state::AppState;
 
 use crate::errors::Error;
 use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
@@ -21,6 +21,7 @@ use ratatui::{
 use std::env;
 
 pub struct ShowApp {
+    app_state: AppState,
     commit: Commit,
     files: Vec<(FileStatus, String)>,
     file_list: List<'static>,
@@ -31,10 +32,11 @@ pub struct ShowApp {
 }
 
 impl ShowApp {
-    pub fn new(config: &Config, revision: Option<String>) -> Result<Self, Error> {
-        set_git_dir(config);
+    pub fn new(revision: Option<String>) -> Result<Self, Error> {
+        let app_state = AppState::new()?;
+        set_git_dir(&app_state.config); // TODO: is it necessary
 
-        let output = git_show_output(&revision, config);
+        let output = git_show_output(&revision, &app_state.config);
         let mut lines = output.lines().map(String::from);
         let (commit, _) = git_parse_commit(&mut lines);
 
@@ -59,7 +61,7 @@ impl ShowApp {
             .block(Block::default().borders(Borders::NONE))
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(config.scroll_off);
+            .scroll_padding(app_state.config.scroll_off);
 
         let metadata = Self::display_commit_metadata(commit.metadata.clone());
         let commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
@@ -68,6 +70,7 @@ impl ShowApp {
         state.select_first();
 
         let r = Self {
+            app_state,
             commit,
             files,
             file_list,
@@ -105,6 +108,10 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
+    fn get_state(&mut self) -> &mut AppState {
+        &mut self.app_state
+    }
+
     fn on_exit(&mut self) -> Result<(), Error> {
         env::set_current_dir(self.original_dir.clone()).map_err(|_| {
             Error::GlobalError("could not restore initial working directory".to_string())
@@ -128,7 +135,7 @@ impl GitApp for ShowApp {
         self.files_height = chunks[1].height as usize;
     }
 
-    fn get_config_fields(&mut self) -> Vec<(&str, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
         vec![("show", true)]
     }
 
@@ -146,10 +153,10 @@ impl GitApp for ShowApp {
         &mut self,
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> Result<bool, Error> {
+    ) -> Result<(), Error> {
         let mut new_state = self.state.clone();
-        let quit = self.run_generic_action(action, self.files_height, terminal, &mut new_state)?;
+        self.run_generic_action(action, self.files_height, terminal, &mut new_state)?;
         self.state = new_state;
-        return Ok(quit);
+        return Ok(());
     }
 }

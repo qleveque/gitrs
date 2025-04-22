@@ -7,13 +7,12 @@ mod git;
 mod input;
 mod show_app;
 mod status_app;
+mod app_state;
 
 use std::io::{self, stdout};
 
 use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
-
-use config::parse_gitrs_config;
 
 use errors::Error;
 use show_app::ShowApp;
@@ -26,7 +25,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use crossterm::{
     execute,
     style::Stylize,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 
 #[derive(Parser)]
@@ -59,24 +58,18 @@ enum Commands {
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Error> {
-    let config = parse_gitrs_config()?;
     let cli = Cli::parse();
     let _ = match cli.command {
-        Commands::Status => StatusApp::new(&config)?.run(terminal, &config),
+        Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => {
-            BlameApp::new(&config, file, None, line)?.run(terminal, &config)
+            BlameApp::new(file, None, line)?.run(terminal)
         }
-        Commands::Show { revision } => ShowApp::new(&config, revision)?.run(terminal, &config),
+        Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
     };
-
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-    disable_raw_mode()?;
     Ok(())
 }
 
 fn main() -> io::Result<()> {
-    enable_raw_mode()?;
     let mut stdout = stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
@@ -85,8 +78,6 @@ fn main() -> io::Result<()> {
     let ret = app(&mut terminal);
 
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-    disable_raw_mode()?;
 
     if let Err(err) = ret {
         eprintln!("{} {}", "error:".red().bold(), err.to_string().white());

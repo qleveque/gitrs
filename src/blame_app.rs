@@ -1,5 +1,6 @@
 use crate::action::Action;
 use crate::app::GitApp;
+use crate::app_state::AppState;
 use crate::config::Config;
 
 use crate::errors::Error;
@@ -27,6 +28,7 @@ use syntect::util::LinesWithEndings;
 use std::path::Path;
 
 pub struct BlameApp<'a> {
+    app_state: AppState,
     file: String,
     blames: Vec<Option<CommitRef>>,
     code: Vec<String>,
@@ -36,12 +38,10 @@ pub struct BlameApp<'a> {
     state: ListState,
     max_blame_len: usize,
     revisions: Vec<Option<String>>,
-    config: &'a Config,
 }
 
 impl<'a> BlameApp<'a> {
     pub fn new(
-        config: &'a Config,
         file: String,
         revision: Option<String>,
         line: usize,
@@ -55,6 +55,7 @@ impl<'a> BlameApp<'a> {
         state.select(Some(line - 1));
         let revisions = vec![revision];
         let mut instance = Self {
+            app_state: AppState::new()?,
             file,
             blames: Vec::new(),
             code: Vec::new(),
@@ -64,7 +65,6 @@ impl<'a> BlameApp<'a> {
             state,
             max_blame_len: 0,
             revisions,
-            config,
         };
         instance.reload()?;
         Ok(instance)
@@ -181,13 +181,17 @@ impl<'a> BlameApp<'a> {
 }
 
 impl GitApp for BlameApp<'_> {
+    fn get_state(&mut self) -> &mut AppState {
+        &mut self.app_state
+    }
+
     fn reload(&mut self) -> Result<(), Error> {
         let revision = self
             .revisions
             .last()
             .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?;
         let (new_blames, new_code) =
-            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.config)?;
+            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.app_state.config)?;
         if new_blames.len() == 0 {
             self.revisions.pop();
             return Ok(());
@@ -224,7 +228,7 @@ impl GitApp for BlameApp<'_> {
             .block(Block::default())
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(self.config.scroll_off);
+            .scroll_padding(self.app_state.config.scroll_off);
 
         let code_items: Vec<ListItem> = self
             .highlighted_lines()?
@@ -235,7 +239,7 @@ impl GitApp for BlameApp<'_> {
             .block(Block::default().borders(Borders::LEFT))
             .style(Style::from(Color::White))
             .highlight_style(Style::from(Color::Black).bg(Color::Gray))
-            .scroll_padding(self.config.scroll_off);
+            .scroll_padding(self.app_state.config.scroll_off);
 
         match self.state.selected() {
             None => self.state.select(Some(len - 1)),
@@ -275,7 +279,7 @@ impl GitApp for BlameApp<'_> {
         );
     }
 
-    fn get_config_fields(&mut self) -> Vec<(&str, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
         vec![("blame", true)]
     }
 
@@ -292,11 +296,11 @@ impl GitApp for BlameApp<'_> {
         &mut self,
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> Result<bool, Error> {
+    ) -> Result<(), Error> {
         match action {
             Action::NextCommitBlame => {
                 if self.revisions.len() == 1 {
-                    return Ok(false);
+                    return Ok(());
                 }
                 self.revisions.pop();
                 self.reload()?;
@@ -309,7 +313,7 @@ impl GitApp for BlameApp<'_> {
                 let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
                 let rev = if let Some(commit) = commit_ref {
                     if let Some('^') = commit.hash.chars().next() {
-                        return Ok(false);
+                        return Ok(());
                     }
                     format!("{}^", commit.hash)
                 } else {
@@ -332,18 +336,17 @@ impl GitApp for BlameApp<'_> {
                         Some(commit.hash.clone())
                     };
                     terminal.clear()?;
-                    ShowApp::new(&self.config, rev)?.run(terminal, self.config)?;
+                    ShowApp::new(rev)?.run(terminal)?;
                     terminal.clear()?;
                 };
             }
             _ => {
                 let mut new_state = self.state.clone();
-                let quit =
-                    self.run_generic_action(action, self.height, terminal, &mut new_state)?;
+                self.run_generic_action(action, self.height, terminal, &mut new_state)?;
                 self.state = new_state;
-                return Ok(quit);
+                return Ok(());
             }
         };
-        return Ok(false);
+        return Ok(());
     }
 }

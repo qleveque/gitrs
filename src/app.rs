@@ -1,12 +1,10 @@
 use std::process::{Command, Stdio};
 
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use ratatui::{prelude::CrosstermBackend, widgets::ListState, Frame, Terminal};
 
 use crate::{
-    action::{Action, CommandType},
-    config::Config,
-    errors::Error,
-    input::InputManager,
+    action::{Action, CommandType}, app_state::AppState, errors::Error, input::InputManager
 };
 
 pub trait GitApp {
@@ -19,34 +17,39 @@ pub trait GitApp {
         Ok(())
     }
 
-    fn get_config_fields(&mut self) -> Vec<(&str, bool)>;
+    fn get_state(&mut self) -> &mut AppState;
+    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
     fn get_file_and_rev(&self) -> (Option<String>, Option<String>);
 
     fn run_action(
         &mut self,
         action: &Action,
         _terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    ) -> Result<bool, Error>;
+    ) -> Result<(), Error>;
 
     fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-        config: &Config,
     ) -> Result<(), Error> {
+        enable_raw_mode()?;
+
         let mut input_manager = InputManager::new();
         loop {
             let _ = terminal.draw(|f| {
                 self.draw(f);
             });
-            let opt_action = self.read_user_action(&mut input_manager, config)?;
+            let opt_action = self.read_user_action(&mut input_manager)?;
             if let Some(action) = opt_action {
-                let quit = self.run_action(&action, terminal)?;
-                if quit {
+                self.run_action(&action, terminal)?;
+                if self.get_state().quit {
                     break;
                 }
             }
         }
         self.on_exit()?;
+
+        disable_raw_mode()?;
+        terminal.show_cursor()?;
         Ok(())
     }
 
@@ -56,15 +59,14 @@ pub trait GitApp {
         height: usize,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         state: &mut ListState,
-    ) -> Result<bool, Error> {
-        let mut quit = false;
+    ) -> Result<(), Error> {
         match action {
             Action::Reload => self.reload()?,
             Action::Up => state.select_previous(),
             Action::Down => state.select_next(),
             Action::First => state.select_first(),
             Action::Last => state.select_last(),
-            Action::Quit => quit = true,
+            Action::Quit => self.get_state().quit = true,
             Action::HalfPageUp => state.scroll_up_by(height as u16 / 3),
             Action::HalfPageDown => state.scroll_down_by(height as u16 / 3),
             Action::CenterVertically => {
@@ -85,11 +87,11 @@ pub trait GitApp {
                 let (file, rev) = self.get_file_and_rev();
                 // TODO: improve
                 self.reload()?;
-                Self::run_command(&command_type, command.to_string(), file, rev);
+                Self::run_command(terminal, &command_type, command.to_string(), file, rev)?;
                 // TODO: improve
                 self.reload()?;
                 match command_type {
-                    CommandType::SyncQuit => quit = true,
+                    CommandType::SyncQuit => self.get_state().quit = true,
                     _ => (),
                 }
             }
@@ -98,13 +100,12 @@ pub trait GitApp {
                 println!("Unknown command in this context");
             }
         }
-        return Ok(quit);
+        Ok(())
     }
 
     fn read_user_action(
         &mut self,
         input_manager: &mut InputManager,
-        config: &Config,
     ) -> Result<Option<Action>, Error> {
         // TODO: unwrap
         if !input_manager.key_pressed()? {
@@ -116,11 +117,14 @@ pub trait GitApp {
         if keys == "" {
             return Ok(None);
         }
-        for field in [self.get_config_fields().as_slice(), &[("global", true)]].concat() {
+
+        let bindings = self.get_state().config.bindings.clone();
+
+        for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
             if !field.1 {
                 continue;
             }
-            if let Some(mode_hotkeys) = config.bindings.get(field.0) {
+            if let Some(mode_hotkeys) = bindings.get(field.0) {
                 for (key_combination, action) in mode_hotkeys {
                     if *action == Action::None {
                         continue;
@@ -138,11 +142,12 @@ pub trait GitApp {
     }
 
     fn run_command(
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         command_type: &CommandType,
         mut command: String,
         filename: Option<String>,
         revision: Option<String>,
-    ) {
+    ) -> Result<(), Error> {
         if let Some(file) = filename {
             command = command.replace("%(file)", &file);
         }
@@ -161,9 +166,13 @@ pub trait GitApp {
                     .expect("Failed to execute command");
             }
             _ => {
+                disable_raw_mode()?;
+                terminal.show_cursor()?;
                 let mut child = proc.spawn().expect("Failed to start git commit");
                 child.wait().expect("Failed to wait for git commit");
+                enable_raw_mode()?;
             }
         }
+        Ok(())
     }
 }
