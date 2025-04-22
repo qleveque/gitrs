@@ -2,14 +2,14 @@ use std::str::FromStr;
 
 use crate::errors::Error;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum CommandType {
     Async,
     Sync,
     SyncQuit,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Action {
     Reload,
     Up,

@@ -2,8 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("unable to parse custom action `{0}`")]
+    #[error("unknown action `{0}`")]
     ParseActionError(String),
+    #[error("unable to set variable `{0}`")]
+    ParseVariableError(String),
     #[error("invalid state index")]
     StateIndexError,
     #[error("i/o error")]

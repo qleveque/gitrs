@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use crate::git::{git_add_restore, git_status_output, GitFile, StagedStatus};
 
+use ratatui::layout::Rect;
 use ratatui::prelude::CrosstermBackend;
 use ratatui::style::Style;
 use ratatui::widgets::{ListState, Paragraph, StatefulWidget};
@@ -198,6 +199,9 @@ impl GitApp for StatusApp {
             &mut self.unstaged_table,
             &mut self.staged_table,
         );
+        if !self.tables_are_empty() && 0 == self.get_current_table().len() {
+            switch_staged_status(&mut self.staged_status, &mut self.state);
+        }
         Ok(())
     }
 
@@ -206,20 +210,19 @@ impl GitApp for StatusApp {
         Ok(())
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
-        let size = frame.area();
-        self.height = size.height as usize;
+    fn draw(&mut self, frame: &mut Frame, rect: Rect) {
+        self.height = rect.height as usize;
 
         if self.tables_are_empty() {
             let paragraph = Paragraph::new("Nothing to commit, working tree clean");
-            frame.render_widget(paragraph, size);
+            frame.render_widget(paragraph, rect);
             return;
         }
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(frame.area());
+            .split(rect);
 
         let left_list = list_to_draw(
             &self.unstaged_table,
@@ -278,13 +281,8 @@ impl GitApp for StatusApp {
         ]
     }
 
-    fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
-        let file = match self.get_filename() {
-            Ok(filename) => Some(filename),
-            Err(_) => None,
-        };
-        let rev = Some("HEAD".to_string());
-        (file, rev)
+    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+        Ok((Some(self.get_filename()?), Some("HEAD".to_string())))
     }
 
     fn run_action(
@@ -348,7 +346,10 @@ impl GitApp for StatusApp {
                 self.staged_status = StagedStatus::Staged;
                 self.state.select_first();
             }
-            _ => {
+            action => {
+                if matches!(action, Action::Command(_, _)) {
+                    git_add_restore(&mut self.git_files, &self.app_state.config);
+                }
                 let mut new_state = self.state.clone();
                 self.run_generic_action(action, self.height, terminal, &mut new_state)?;
                 self.state = new_state;

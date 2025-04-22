@@ -1,14 +1,22 @@
 use std::process::{Command, Stdio};
 
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use ratatui::{prelude::CrosstermBackend, widgets::ListState, Frame, Terminal};
+use crossterm::{event::{self, KeyCode, KeyEventKind, KeyModifiers}, terminal::{disable_raw_mode, enable_raw_mode}};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    prelude::CrosstermBackend,
+    style::{Color, Style},
+    widgets::{Block, Borders, ListState, Paragraph, Widget},
+    Frame, Terminal,
+};
 
 use crate::{
-    action::{Action, CommandType}, app_state::AppState, errors::Error, input::InputManager
+    action::{Action, CommandType},
+    app_state::{AppState, Notif, NotifType},
+    errors::Error,
 };
 
 pub trait GitApp {
-    fn draw(&mut self, frame: &mut Frame);
+    fn draw(&mut self, frame: &mut Frame, rect: Rect);
 
     fn on_exit(&mut self) -> Result<(), Error> {
         Ok(())
@@ -19,7 +27,7 @@ pub trait GitApp {
 
     fn get_state(&mut self) -> &mut AppState;
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
-    fn get_file_and_rev(&self) -> (Option<String>, Option<String>);
+    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error>;
 
     fn run_action(
         &mut self,
@@ -27,23 +35,65 @@ pub trait GitApp {
         _terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error>;
 
+    fn notif(&mut self, notif_type: NotifType, message: &str) {
+        self.get_state().notif = Some(Notif {
+            notif_type,
+            message: message.to_string(),
+        });
+    }
+    fn info(&mut self, message: &str) {
+        self.notif(NotifType::Info, message);
+    }
+    fn error(&mut self, message: &str) {
+        self.notif(NotifType::Error, message);
+    }
+
     fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         enable_raw_mode()?;
 
-        let mut input_manager = InputManager::new();
         loop {
-            let _ = terminal.draw(|f| {
-                self.draw(f);
-            });
-            let opt_action = self.read_user_action(&mut input_manager)?;
+
+            terminal.draw(|frame| {
+                let mut chunk = frame.area();
+
+                if let Some(notif) = self.get_state().notif.clone() {
+                    let style = match notif.notif_type {
+                        NotifType::Info => Style::from(Color::Blue),
+                        NotifType::Error => Style::from(Color::Red),
+                    };
+                    let paragraph = Paragraph::new(&*notif.message)
+                        .block(Block::default().borders(Borders::TOP))
+                        .style(style);
+
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Min(0), Constraint::Length(2)])
+                        .split(chunk);
+                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+                    chunk = chunks[0];
+                }
+                self.draw(frame, chunk);
+            })?;
+
+            self.get_state().notif = None;
+
+            let opt_action = self.get_user_action()?;
             if let Some(action) = opt_action {
-                self.run_action(&action, terminal)?;
+                self.get_state().key_combination = "".to_string();
+                match self.run_action(&action, terminal) {
+                    Err(err) => self.error(&err.to_string()),
+                    Ok(()) => (),
+                }
                 if self.get_state().quit {
                     break;
                 }
+            }
+            let key_combination = self.get_state().key_combination.clone();
+            if self.get_state().notif.is_none() && !key_combination.is_empty(){
+                self.info(&key_combination);
             }
         }
         self.on_exit()?;
@@ -51,6 +101,44 @@ pub trait GitApp {
         disable_raw_mode()?;
         terminal.show_cursor()?;
         Ok(())
+    }
+
+
+    fn key_pressed(&mut self) -> Result<bool, Error> {
+        if event::poll(std::time::Duration::from_millis(100))? {
+            if let event::Event::Key(key_event) = event::read()? {
+                if key_event.kind == KeyEventKind::Press {
+                    let mut key_str = match key_event.code {
+                        KeyCode::Up => "up".to_string(),
+                        KeyCode::Down => "down".to_string(),
+                        KeyCode::Right => "right".to_string(),
+                        KeyCode::Left => "left".to_string(),
+                        KeyCode::Enter => "cr".to_string(),
+                        KeyCode::Tab => "tab".to_string(),
+                        KeyCode::Home => "home".to_string(),
+                        KeyCode::End => "end".to_string(),
+                        KeyCode::Esc => "esc".to_string(),
+                        KeyCode::PageUp => "pgup".to_string(),
+                        KeyCode::PageDown => "pgdown".to_string(),
+                        KeyCode::Char(' ') => "space".to_string(),
+                        key_code => key_code.to_string(),
+                    };
+
+                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+                        key_str = format!("<c-{}>", key_str).to_string();
+                    } else if key_str.len() > 1 {
+                        key_str = format!("<{}>", key_str).to_string();
+                    }
+                    self.get_state().key_combination = format!(
+                        "{}{}",
+                        self.get_state().key_combination,
+                        key_str,
+                    );
+                    return Ok(true);
+                }
+            }
+        }
+        return Ok(false);
     }
 
     fn run_generic_action(
@@ -79,47 +167,45 @@ pub trait GitApp {
                 };
             }
             Action::Command(command_type, command) => {
-                //TODO: remove unwrap
                 match command_type {
                     CommandType::Sync | CommandType::SyncQuit => terminal.clear()?,
                     _ => (),
                 }
-                let (file, rev) = self.get_file_and_rev();
-                // TODO: improve
-                self.reload()?;
+                let (file, rev) = self.get_file_and_rev()?;
                 Self::run_command(terminal, &command_type, command.to_string(), file, rev)?;
-                // TODO: improve
-                self.reload()?;
                 match command_type {
                     CommandType::SyncQuit => self.get_state().quit = true,
+                    CommandType::Sync => self.reload()?,
                     _ => (),
                 }
             }
             Action::None => (),
-            _ => {
-                println!("Unknown command in this context");
+            action => {
+                return Err(Error::GlobalError(
+                    format!("cannot run `{:?}` in this context", action)
+                ));
             }
         }
         Ok(())
     }
 
-    fn read_user_action(
+    fn get_user_action(
         &mut self,
-        input_manager: &mut InputManager,
     ) -> Result<Option<Action>, Error> {
         // TODO: unwrap
-        if !input_manager.key_pressed()? {
+        if !self.key_pressed()? {
             return Ok(None);
         }
 
         // Compute command to run from config
-        let keys = input_manager.key_combination.clone();
+        let keys = self.get_state().key_combination.clone();
         if keys == "" {
             return Ok(None);
         }
 
         let bindings = self.get_state().config.bindings.clone();
 
+        let mut potential = false;
         for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
             if !field.1 {
                 continue;
@@ -133,10 +219,13 @@ pub trait GitApp {
                         return Ok(Some(action.clone()));
                     }
                     if key_combination.starts_with(&keys) {
-                        input_manager.reset_key_combination = false;
+                        potential = true;
                     }
                 }
             }
+        }
+        if !potential {
+            self.get_state().key_combination = "".to_string();
         }
         Ok(None)
     }

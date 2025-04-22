@@ -5,6 +5,7 @@ use crate::app_state::AppState;
 use crate::errors::Error;
 use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
 
+use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{ListState, Paragraph, StatefulWidget, Widget};
@@ -118,12 +119,12 @@ impl GitApp for ShowApp {
         })
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame, rect: Rect) {
         let paragraph_len = self.commit.metadata.lines().count() + 1;
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(paragraph_len as u16), Constraint::Min(5)])
-            .split(frame.area());
+            .split(rect);
 
         Widget::render(&self.commit_paragraph, chunks[0], frame.buffer_mut());
         StatefulWidget::render(
@@ -139,14 +140,11 @@ impl GitApp for ShowApp {
         vec![("show", true)]
     }
 
-    fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
-        let filename = self
-            .state
-            .selected()
-            .and_then(|idx| self.files.get(idx))
-            .map(|file| file.1.clone());
+    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+        let idx = self.state.selected().ok_or_else(|| Error::StateIndexError)?;
+        let file = self.files.get(idx).ok_or_else(|| Error::StateIndexError)?;
         let rev = Some(self.commit.hash.clone());
-        (filename, rev)
+        Ok((Some(file.1.clone()), rev))
     }
 
     fn run_action(

@@ -7,6 +7,7 @@ use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
 use crate::show_app::ShowApp;
 
+use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, StatefulWidget};
@@ -252,9 +253,8 @@ impl GitApp for BlameApp<'_> {
         Ok(())
     }
 
-    fn draw(&mut self, frame: &mut Frame) {
-        let size = frame.area();
-        self.height = size.height as usize;
+    fn draw(&mut self, frame: &mut Frame, rect: Rect) {
+        self.height = rect.height as usize;
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -262,7 +262,7 @@ impl GitApp for BlameApp<'_> {
                 Constraint::Length(self.max_blame_len as u16),
                 Constraint::Min(0),
             ])
-            .split(frame.area());
+            .split(rect);
 
         StatefulWidget::render(
             &self.blame_list,
@@ -283,13 +283,13 @@ impl GitApp for BlameApp<'_> {
         vec![("blame", true)]
     }
 
-    fn get_file_and_rev(&self) -> (Option<String>, Option<String>) {
+    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
         let rev = self
             .state
             .selected()
             .and_then(|idx| self.blames.get(idx))
             .and_then(|opt_commit| opt_commit.as_ref().map(|commit| commit.hash.clone()));
-        (Some(self.file.clone()), rev)
+        Ok((Some(self.file.clone()), rev))
     }
 
     fn run_action(

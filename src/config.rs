@@ -121,7 +121,7 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                             }
                         }
                         "git" => config.git_exe = value,
-                        _ => (),
+                        variable => return Err(Error::ParseVariableError(variable.to_string())),
                     }
                 }
                 _ => (),

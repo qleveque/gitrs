@@ -4,7 +4,6 @@ mod blame_app;
 mod config;
 mod errors;
 mod git;
-mod input;
 mod show_app;
 mod status_app;
 mod app_state;
