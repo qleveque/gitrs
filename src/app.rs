@@ -1,14 +1,10 @@
 use std::{io::stdout, process::{Command, Stdio}};
 
 use crossterm::{
-    event::{self, KeyCode, KeyEventKind, KeyModifiers}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    prelude::CrosstermBackend,
-    style::{Color, Style},
-    widgets::{Block, Borders, ListState, Paragraph, Widget},
-    Frame, Terminal,
+    layout::{Constraint, Direction, Layout, Rect}, prelude::CrosstermBackend, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, ListState, Paragraph, Widget}, Frame, Terminal
 };
 
 use crate::{
@@ -26,6 +22,9 @@ pub trait GitApp {
     fn reload(&mut self) -> Result<(), Error> {
         Ok(())
     }
+    fn search_result(&mut self, _state: &mut ListState, _reversed: bool) -> Result<(), Error> {
+        Ok(())
+    }
 
     fn get_state(&mut self) -> &mut AppState;
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
@@ -38,7 +37,7 @@ pub trait GitApp {
     ) -> Result<(), Error>;
 
     fn notif(&mut self, notif_type: NotifType, message: &str) {
-        self.get_state().notif = Some(Notif {
+        self.get_state().notif.push(Notif {
             notif_type,
             message: message.to_string(),
         });
@@ -54,21 +53,25 @@ pub trait GitApp {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        enable_raw_mode()?;
-        terminal.clear()?;
-
         loop {
             terminal.draw(|frame| {
                 let mut chunk = frame.area();
 
                 if self.get_state().input_state == InputState::Search || !self.get_state().search_string.is_empty() {
                     let search_string = if self.get_state().input_state == InputState::Search {
-                      format!("/{}|", self.get_state().search_string)
+                        match self.get_state().search_reverse {
+                            false => format!("/{}|", self.get_state().search_string),
+                            true => format!("?{}|", self.get_state().search_string),
+                        }
                     } else {
                       format!(" {}", self.get_state().search_string)
                     };
+                    let title = match self.get_state().search_reverse {
+                        false => "Search",
+                        true => "Search (rev)",
+                    };
                     let paragraph = Paragraph::new(search_string)
-                        .block(Block::default().borders(Borders::TOP).title("Search"));
+                        .block(Block::default().borders(Borders::TOP).title(title));
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints([Constraint::Min(0), Constraint::Length(2)])
@@ -89,22 +92,21 @@ pub trait GitApp {
                     chunk = chunks[0];
                 } 
 
-                if let Some(notif) = self.get_state().notif.clone() {
-                    let style = match notif.notif_type {
-                        NotifType::Info => Style::from(Color::Blue),
-                        NotifType::Error => Style::from(Color::Red),
-                    };
-                    let title = match notif.notif_type {
-                        NotifType::Info => "Info",
-                        NotifType::Error => "Error",
-                    };
-                    let paragraph = Paragraph::new(&*notif.message)
-                        .block(Block::default().borders(Borders::TOP).title(title))
-                        .style(style);
+                if !self.get_state().notif.is_empty() {
+                    let lines: Vec<Line> = self.get_state().notif.iter().map(|notif| {
+                        let line_style = match notif.notif_type {
+                            NotifType::Info => Style::from(Color::Blue),
+                            NotifType::Error => Style::from(Color::Red),
+                        };
+                        Line::styled(notif.message.to_string(), line_style)
+                    }).collect();
+                    let paragraph = Paragraph::new(Text::from(lines))
+                        .block(Block::default().borders(Borders::TOP).title("Messages"));
 
+                    let len = self.get_state().notif.len() as u16 + 1;
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(0), Constraint::Length(2)])
+                        .constraints([Constraint::Min(0), Constraint::Length(len)])
                         .split(chunk);
                     Widget::render(&paragraph, chunks[1], frame.buffer_mut());
                     chunk = chunks[0];
@@ -113,9 +115,15 @@ pub trait GitApp {
                 self.draw(frame, chunk);
             })?;
 
-            let opt_action = self.handle_user_input()?;
+            let opt_action = match self.handle_user_input() {
+                Err(err) => {
+                    self.error(&err.to_string());
+                    None
+                },
+                Ok(opt_action) => opt_action,
+            };
+
             if let Some(action) = opt_action {
-                self.get_state().key_combination = "".to_string();
                 match self.run_action(&action, terminal) {
                     Err(err) => self.error(&err.to_string()),
                     Ok(()) => (),
@@ -127,87 +135,120 @@ pub trait GitApp {
 
             // display key combination if multiple letters
             let key_combination = self.get_state().key_combination.clone();
-            if self.get_state().notif.is_none() && !key_combination.is_empty() {
-                self.info(&key_combination);
+            if self.get_state().notif.is_empty() && !key_combination.is_empty() {
+                self.info(&format!("Keys: {}", key_combination));
             }
         }
         self.on_exit()?;
 
-        disable_raw_mode()?;
-        terminal.show_cursor()?;
         Ok(())
     }
 
-    fn key_pressed(&mut self) -> Result<bool, Error> {
-        if event::poll(std::time::Duration::from_millis(100))? {
-            if let event::Event::Key(key_event) = event::read()? {
-                if key_event.kind == KeyEventKind::Press {
-                    let input_state = self.get_state().input_state.clone();
 
-                    self.get_state().notif = None;
+    fn handle_line_edited(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
+        let input_state = self.get_state().input_state.clone();
+        match key_event.code {
+            KeyCode::Enter => {
+                // Return :command action if any
+                self.get_state().input_state = InputState::App;
+                match input_state {
+                    InputState::Command => {
+                        let command_string = self.get_state().command_string.clone();
+                        self.get_state().command_string.clear();
+                        return Ok(Some(command_string.parse::<Action>()?));
+                    },
+                    InputState::Search => {
+                        return Ok(Some(Action::NextSearchResult));
+                    },
+                    InputState::App => (),
+                } 
+            },
+            KeyCode::Esc => {
+                match input_state {
+                    InputState::Search => self.get_state().search_string.clear(),
+                    InputState::Command => self.get_state().command_string.clear(),
+                    InputState::App => (),
+                }
+                self.get_state().input_state = InputState::App;
+            },
+            KeyCode::Backspace => {
+                match input_state {
+                    InputState::Search => {self.get_state().search_string.pop();},
+                    InputState::Command => {self.get_state().command_string.pop();},
+                    InputState::App => (),
+                };
+            },
+            KeyCode::Char(c) => {
+                match input_state {
+                    InputState::Search => self.get_state().search_string.push(c),
+                    InputState::Command => self.get_state().command_string.push(c),
+                    InputState::App => (),
+                };
+            },
+            _ => {
+                self.error("error: this char is not handled yet");
+            }
+        }
+        Ok(None)
+    }
 
-                    if input_state != InputState::App {
-                        match key_event.code {
-                            KeyCode::Enter => {
-                                self.get_state().input_state = InputState::App;
-                            },
-                            KeyCode::Esc => {
-                                match input_state {
-                                    InputState::Search => self.get_state().search_string.clear(),
-                                    InputState::Command => self.get_state().command_string.clear(),
-                                    InputState::App => (),
-                                }
-                                self.get_state().input_state = InputState::App;
-                            },
-                            KeyCode::Backspace => {
-                                match input_state {
-                                    InputState::Search => {self.get_state().search_string.pop();},
-                                    InputState::Command => {self.get_state().command_string.pop();},
-                                    InputState::App => (),
-                                };
-                            },
-                            KeyCode::Char(c) => {
-                                match input_state {
-                                    InputState::Search => self.get_state().search_string.push(c),
-                                    InputState::Command => self.get_state().command_string.push(c),
-                                    InputState::App => (),
-                                };
-                            },
-                            _ => {
-                                self.error("error: this char is not handled yet");
-                                return Ok(false);
-                            }
-                        }
-                        return Ok(true);
+    fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
+        let mut key_str = match key_event.code {
+            KeyCode::Up => "up".to_string(),
+            KeyCode::Down => "down".to_string(),
+            KeyCode::Right => "right".to_string(),
+            KeyCode::Left => "left".to_string(),
+            KeyCode::Enter => "cr".to_string(),
+            KeyCode::Tab => "tab".to_string(),
+            KeyCode::Home => "home".to_string(),
+            KeyCode::End => "end".to_string(),
+            KeyCode::Esc => "esc".to_string(),
+            KeyCode::PageUp => "pgup".to_string(),
+            KeyCode::PageDown => "pgdown".to_string(),
+            KeyCode::Char(' ') => "space".to_string(),
+            key_code => key_code.to_string(),
+        };
+
+        if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+            key_str = format!("<c-{}>", key_str).to_string();
+        } else if key_str.len() > 1 {
+            key_str = format!("<{}>", key_str).to_string();
+        }
+        self.get_state().key_combination.push_str(&key_str);
+
+
+        // Compute command to run from config
+        let keys = self.get_state().key_combination.clone();
+        if keys == "" {
+            return Ok(None);
+        }
+
+        let bindings = self.get_state().config.bindings.clone();
+
+        let mut potential = false;
+        for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
+            if !field.1 {
+                continue;
+            }
+            if let Some(mode_hotkeys) = bindings.get(field.0) {
+                for (key_combination, action) in mode_hotkeys {
+                    if *action == Action::None {
+                        continue;
                     }
-
-                    let mut key_str = match key_event.code {
-                        KeyCode::Up => "up".to_string(),
-                        KeyCode::Down => "down".to_string(),
-                        KeyCode::Right => "right".to_string(),
-                        KeyCode::Left => "left".to_string(),
-                        KeyCode::Enter => "cr".to_string(),
-                        KeyCode::Tab => "tab".to_string(),
-                        KeyCode::Home => "home".to_string(),
-                        KeyCode::End => "end".to_string(),
-                        KeyCode::Esc => "esc".to_string(),
-                        KeyCode::PageUp => "pgup".to_string(),
-                        KeyCode::PageDown => "pgdown".to_string(),
-                        KeyCode::Char(' ') => "space".to_string(),
-                        key_code => key_code.to_string(),
-                    };
-
-                    if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                        key_str = format!("<c-{}>", key_str).to_string();
-                    } else if key_str.len() > 1 {
-                        key_str = format!("<{}>", key_str).to_string();
+                    if *key_combination == keys {
+                        self.get_state().key_combination.clear();
+                        return Ok(Some(action.clone()));
                     }
-                    self.get_state().key_combination.push_str(&key_str);
-                    return Ok(true);
+                    if key_combination.starts_with(&keys) {
+                        potential = true;
+                    }
                 }
             }
         }
-        return Ok(false);
+        if !potential {
+            self.get_state().key_combination.clear();
+        }
+        Ok(None)
     }
 
     fn run_generic_action(
@@ -239,8 +280,19 @@ pub trait GitApp {
                 let (file, rev) = self.get_file_and_rev()?;
                 self.run_command(terminal, &command_type, command.to_string(), file, rev)?;
             }
-            Action::Search => self.get_state().input_state = InputState::Search,
+            Action::Search => {
+                self.get_state().search_string = "".to_string();
+                self.get_state().search_reverse = false;
+                self.get_state().input_state = InputState::Search;
+            },
+            Action::SearchReverse => {
+                self.get_state().search_string = "".to_string();
+                self.get_state().search_reverse = true;
+                self.get_state().input_state = InputState::Search;
+            },
             Action::TypeCommand => self.get_state().input_state = InputState::Command,
+            Action::NextSearchResult => self.search_result(state, false)?,
+            Action::PreviousSearchResult => self.search_result(state, true)?,
             Action::None => (),
             action => {
                 return Err(Error::GlobalError(format!(
@@ -252,49 +304,31 @@ pub trait GitApp {
         Ok(())
     }
 
-    fn handle_user_input(&mut self) -> Result<Option<Action>, Error> {
-        // TODO: unwrap
-        if !self.key_pressed()? {
-            return Ok(None);
-        }
-
-        if self.get_state().input_state == InputState::App && !self.get_state().command_string.is_empty() {
-            let command_string = self.get_state().command_string.clone();
-            self.get_state().command_string.clear();
-            return Ok(Some(command_string.parse::<Action>()?));
-        }
-
-        // Compute command to run from config
-        let keys = self.get_state().key_combination.clone();
-        if keys == "" {
-            return Ok(None);
-        }
-
-        let bindings = self.get_state().config.bindings.clone();
-
-        let mut potential = false;
-        for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
-            if !field.1 {
-                continue;
-            }
-            if let Some(mode_hotkeys) = bindings.get(field.0) {
-                for (key_combination, action) in mode_hotkeys {
-                    if *action == Action::None {
-                        continue;
-                    }
-                    if *key_combination == keys {
-                        return Ok(Some(action.clone()));
-                    }
-                    if key_combination.starts_with(&keys) {
-                        potential = true;
-                    }
+    fn press_key() -> Result<Option<KeyEvent>, Error> {
+        if event::poll(std::time::Duration::from_millis(100))? {
+            if let event::Event::Key(key_event) = event::read()? {
+                if key_event.kind == KeyEventKind::Press {
+                    return Ok(Some(key_event));
                 }
             }
         }
-        if !potential {
-            self.get_state().key_combination = "".to_string();
-        }
         Ok(None)
+    }
+
+    fn handle_user_input(&mut self) -> Result<Option<Action>, Error> {
+
+        let key_event = match Self::press_key()? {
+            Some(key_event) => key_event,
+            None => { return Ok(None); },
+        };
+        self.get_state().notif = Vec::new();
+
+        let input_state = self.get_state().input_state.clone();
+        if input_state == InputState::App {
+            Ok(self.handle_key_event(key_event)?)
+        } else {
+            Ok(self.handle_line_edited(key_event)?)
+        }
     }
 
     fn run_command(

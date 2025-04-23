@@ -24,9 +24,10 @@ pub enum InputState {
 pub struct AppState {
     pub quit: bool,
     pub config: Config,
-    pub notif: Option<Notif>,
+    pub notif: Vec<Notif>,
     pub key_combination: String,
     pub search_string: String,
+    pub search_reverse: bool,
     pub command_string: String,
     pub input_state: InputState,
 }
@@ -36,9 +37,10 @@ impl AppState {
         let r = Self {
             quit: false,
             config: parse_gitrs_config()?,
-            notif: None,
+            notif: Vec::new(),
             key_combination: "".to_string(),
             search_string: "".to_string(),
+            search_reverse: false,
             command_string: "".to_string(),
             input_state: InputState::App,
         };

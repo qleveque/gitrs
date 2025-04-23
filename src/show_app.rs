@@ -113,6 +113,30 @@ impl GitApp for ShowApp {
         &mut self.app_state
     }
 
+    fn search_result(&mut self, state: &mut ListState, mut reversed: bool) -> Result<(), Error> {
+        reversed ^= self.get_state().search_reverse;
+
+        let mut idx = state.selected().ok_or_else(|| Error::StateIndexError)?;
+        let search_string = self.get_state().search_string.clone();
+        loop {
+            match reversed {
+                true => {
+                    if idx == 0 {
+                        return Err(Error::ReachedLastMachted);
+                    }
+                    idx -= 1;
+                }
+                false => idx += 1,
+            }
+            let tuple = self.files.get(idx as usize).ok_or_else(|| Error::ReachedLastMachted)?;
+            let filename: String = tuple.1.clone();
+            if filename.contains(&search_string) {
+                state.select(Some(idx as usize));
+                return Ok(());
+            }
+        }
+    }
+
     fn on_exit(&mut self) -> Result<(), Error> {
         env::set_current_dir(self.original_dir.clone()).map_err(|_| {
             Error::GlobalError("could not restore initial working directory".to_string())

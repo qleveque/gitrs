@@ -8,6 +8,8 @@ pub enum Error {
     ParseVariableError(String),
     #[error("invalid state index")]
     StateIndexError,
+    #[error("reached last match")]
+    ReachedLastMachted,
     #[error("i/o error")]
     IOError(#[from] std::io::Error),
     #[error("unknown filename `{0}`")]

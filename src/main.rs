@@ -24,7 +24,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use crossterm::{
     execute,
     style::Stylize,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
 #[derive(Parser)]
@@ -58,14 +58,19 @@ enum Commands {
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Error> {
     let cli = Cli::parse();
-    let _ = match cli.command {
+
+    enable_raw_mode()?;
+    terminal.clear()?;
+    let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => {
             BlameApp::new(file, None, line)?.run(terminal)
         }
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
     };
-    Ok(())
+    disable_raw_mode()?;
+    terminal.show_cursor()?;
+    ret
 }
 
 fn main() -> io::Result<()> {
