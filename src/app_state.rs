@@ -14,13 +14,21 @@ pub struct Notif {
     pub message: String,
 }
 
+#[derive(Clone, PartialEq)]
+pub enum InputState {
+    App,
+    Search,
+    Command,
+}
+
 pub struct AppState {
     pub quit: bool,
     pub config: Config,
     pub notif: Option<Notif>,
     pub key_combination: String,
     pub search_string: String,
-    pub is_searching: bool,
+    pub command_string: String,
+    pub input_state: InputState,
 }
 
 impl AppState {
@@ -31,7 +39,8 @@ impl AppState {
             notif: None,
             key_combination: "".to_string(),
             search_string: "".to_string(),
-            is_searching: false,
+            command_string: "".to_string(),
+            input_state: InputState::App,
         };
         return Ok(r);
     }

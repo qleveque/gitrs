@@ -21,6 +21,7 @@ pub enum Action {
     HalfPageDown,
     CenterVertically,
     Search,
+    TypeCommand,
     Command(CommandType, String),
     StageUnstageFile,
     StageUnstageFiles,
@@ -56,6 +57,7 @@ impl FromStr for Action {
             "show_commit" => Ok(Action::ShowCommit),
             "next_commit_blame" => Ok(Action::NextCommitBlame),
             "previous_commit_blame" => Ok(Action::PreviousCommitBlame),
+            "type_command" => Ok(Action::TypeCommand),
             "nop" => Ok(Action::None),
             cmd => {
                 let command_type = match cmd.chars().next() {

@@ -1,8 +1,7 @@
-use std::process::{Command, Stdio};
+use std::{io::stdout, process::{Command, Stdio}};
 
 use crossterm::{
-    event::{self, KeyCode, KeyEventKind, KeyModifiers},
-    terminal::{disable_raw_mode, enable_raw_mode},
+    event::{self, KeyCode, KeyEventKind, KeyModifiers}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -14,7 +13,7 @@ use ratatui::{
 
 use crate::{
     action::{Action, CommandType},
-    app_state::{AppState, Notif, NotifType},
+    app_state::{AppState, InputState, Notif, NotifType},
     errors::Error,
 };
 
@@ -56,18 +55,32 @@ pub trait GitApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         enable_raw_mode()?;
+        terminal.clear()?;
 
         loop {
             terminal.draw(|frame| {
                 let mut chunk = frame.area();
 
-                if self.get_state().is_searching || !self.get_state().search_string.is_empty() {
-                    let mut searched_string = self.get_state().search_string.clone();
-                    if self.get_state().is_searching {
-                        searched_string.push_str("│")
-                    }
-                    let paragraph = Paragraph::new(searched_string)
+                if self.get_state().input_state == InputState::Search || !self.get_state().search_string.is_empty() {
+                    let search_string = if self.get_state().input_state == InputState::Search {
+                      format!("/{}|", self.get_state().search_string)
+                    } else {
+                      format!(" {}", self.get_state().search_string)
+                    };
+                    let paragraph = Paragraph::new(search_string)
                         .block(Block::default().borders(Borders::TOP).title("Search"));
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Min(0), Constraint::Length(2)])
+                        .split(chunk);
+                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+                    chunk = chunks[0];
+                } 
+
+                if self.get_state().input_state == InputState::Command {
+                    let command_string = format!(":{}│", self.get_state().command_string);
+                    let paragraph = Paragraph::new(command_string)
+                        .block(Block::default().borders(Borders::TOP).title("Command"));
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints([Constraint::Min(0), Constraint::Length(2)])
@@ -129,30 +142,43 @@ pub trait GitApp {
         if event::poll(std::time::Duration::from_millis(100))? {
             if let event::Event::Key(key_event) = event::read()? {
                 if key_event.kind == KeyEventKind::Press {
+                    let input_state = self.get_state().input_state.clone();
 
-                    if self.get_state().is_searching {
+                    self.get_state().notif = None;
 
+                    if input_state != InputState::App {
                         match key_event.code {
                             KeyCode::Enter => {
-                                self.get_state().is_searching = false;
+                                self.get_state().input_state = InputState::App;
                             },
                             KeyCode::Esc => {
-                                self.get_state().is_searching = false;
-                                self.get_state().search_string = "".to_string();
+                                match input_state {
+                                    InputState::Search => self.get_state().search_string.clear(),
+                                    InputState::Command => self.get_state().command_string.clear(),
+                                    InputState::App => (),
+                                }
+                                self.get_state().input_state = InputState::App;
                             },
                             KeyCode::Backspace => {
-                                self.get_state().search_string.pop();
+                                match input_state {
+                                    InputState::Search => {self.get_state().search_string.pop();},
+                                    InputState::Command => {self.get_state().command_string.pop();},
+                                    InputState::App => (),
+                                };
                             },
-                            KeyCode::Char(char) => {
-                                self.get_state().search_string.push(char);
+                            KeyCode::Char(c) => {
+                                match input_state {
+                                    InputState::Search => self.get_state().search_string.push(c),
+                                    InputState::Command => self.get_state().command_string.push(c),
+                                    InputState::App => (),
+                                };
                             },
                             _ => {
                                 self.error("error: this char is not handled yet");
                                 return Ok(false);
                             }
                         }
-                        self.get_state().notif = None;
-                        return Ok(false);
+                        return Ok(true);
                     }
 
                     let mut key_str = match key_event.code {
@@ -210,21 +236,11 @@ pub trait GitApp {
                 };
             }
             Action::Command(command_type, command) => {
-                match command_type {
-                    CommandType::Sync | CommandType::SyncQuit => terminal.clear()?,
-                    _ => (),
-                }
                 let (file, rev) = self.get_file_and_rev()?;
-                Self::run_command(terminal, &command_type, command.to_string(), file, rev)?;
-                match command_type {
-                    CommandType::SyncQuit => self.get_state().quit = true,
-                    CommandType::Sync => self.reload()?,
-                    _ => (),
-                }
+                self.run_command(terminal, &command_type, command.to_string(), file, rev)?;
             }
-            Action::Search => {
-                self.get_state().is_searching = true;
-            }
+            Action::Search => self.get_state().input_state = InputState::Search,
+            Action::TypeCommand => self.get_state().input_state = InputState::Command,
             Action::None => (),
             action => {
                 return Err(Error::GlobalError(format!(
@@ -241,7 +257,12 @@ pub trait GitApp {
         if !self.key_pressed()? {
             return Ok(None);
         }
-        self.get_state().notif = None;
+
+        if self.get_state().input_state == InputState::App && !self.get_state().command_string.is_empty() {
+            let command_string = self.get_state().command_string.clone();
+            self.get_state().command_string.clear();
+            return Ok(Some(command_string.parse::<Action>()?));
+        }
 
         // Compute command to run from config
         let keys = self.get_state().key_combination.clone();
@@ -277,6 +298,7 @@ pub trait GitApp {
     }
 
     fn run_command(
+        &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         command_type: &CommandType,
         mut command: String,
@@ -302,12 +324,25 @@ pub trait GitApp {
             }
             _ => {
                 disable_raw_mode()?;
+                execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
                 terminal.show_cursor()?;
-                let mut child = proc.spawn().expect("Failed to start git commit");
-                child.wait().expect("Failed to wait for git commit");
+
+                let mut child = proc.spawn()?;
+                child.wait()?;
+
                 enable_raw_mode()?;
+                execute!(stdout(), EnterAlternateScreen)?;
+                terminal.hide_cursor()?;
+                terminal.clear()?;
             }
         }
+
+        match command_type {
+            CommandType::SyncQuit => self.get_state().quit = true,
+            CommandType::Sync => self.reload()?,
+            _ => (),
+        }
+
         Ok(())
     }
 }

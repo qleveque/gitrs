@@ -38,6 +38,7 @@ impl Default for Config {
                     ("zz".to_string(), Action::CenterVertically),
                     ("/".to_string(), Action::Search),
                     ("<c-f>".to_string(), Action::Search),
+                    (":".to_string(), Action::TypeCommand),
                 ],
             ),
             (
