@@ -42,7 +42,9 @@ impl ShowApp {
         let output = git_show_output(&revision, &state.config);
         let mut lines = output.lines().map(String::from);
         let (mut commit, _) = git_parse_commit(&mut lines);
-        commit.files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        commit
+            .files
+            .sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
         state.list_state.select_first();
 
@@ -86,9 +88,10 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
-
     fn reload(&mut self) -> Result<(), Error> {
-        let file_items: Vec<ListItem> = self.commit.files
+        let file_items: Vec<ListItem> = self
+            .commit
+            .files
             .iter()
             .map(|(status, name)| {
                 let label = format!("{} {}", status.character(), name);
@@ -117,27 +120,10 @@ impl GitApp for ShowApp {
         &mut self.state
     }
 
-    fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
-        reversed ^= self.state().search_reverse;
-
-        let mut idx = self.state().list_state.selected().ok_or_else(|| Error::StateIndexError)?;
-        let search_string = self.state().search_string.clone();
-        loop {
-            match reversed {
-                true => {
-                    if idx == 0 {
-                        return Err(Error::ReachedLastMachted);
-                    }
-                    idx -= 1;
-                }
-                false => idx += 1,
-            }
-            let tuple = self.commit.files.get(idx as usize).ok_or_else(|| Error::ReachedLastMachted)?;
-            let filename: String = tuple.1.clone();
-            if filename.contains(&search_string) {
-                self.state().list_state.select(Some(idx as usize));
-                return Ok(());
-            }
+    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
+        match self.commit.files.get(idx) {
+            Some(tuple) => Some(&tuple.1),
+            None => None,
         }
     }
 
@@ -154,7 +140,11 @@ impl GitApp for ShowApp {
             .constraints([Constraint::Length(paragraph_len as u16), Constraint::Min(5)])
             .split(rect);
 
-        Widget::render(&self.view_model.commit_paragraph, chunks[0], frame.buffer_mut());
+        Widget::render(
+            &self.view_model.commit_paragraph,
+            chunks[0],
+            frame.buffer_mut(),
+        );
         StatefulWidget::render(
             &self.view_model.file_list,
             chunks[1],
@@ -169,8 +159,16 @@ impl GitApp for ShowApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        let idx = self.state.list_state.selected().ok_or_else(|| Error::StateIndexError)?;
-        let file = self.commit.files.get(idx).ok_or_else(|| Error::StateIndexError)?;
+        let idx = self
+            .state
+            .list_state
+            .selected()
+            .ok_or_else(|| Error::StateIndexError)?;
+        let file = self
+            .commit
+            .files
+            .get(idx)
+            .ok_or_else(|| Error::StateIndexError)?;
         let rev = Some(self.commit.hash.clone());
         Ok((Some(file.1.clone()), rev))
     }

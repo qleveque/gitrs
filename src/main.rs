@@ -1,12 +1,12 @@
 mod action;
 mod app;
+mod app_state;
 mod blame_app;
 mod config;
 mod errors;
 mod git;
 mod show_app;
 mod status_app;
-mod app_state;
 mod view_list;
 
 use std::io::{self, stdout};
@@ -64,9 +64,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(),
     terminal.clear()?;
     let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
-        Commands::Blame { file, line } => {
-            BlameApp::new(file, None, line)?.run(terminal)
-        }
+        Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
     };
     disable_raw_mode()?;

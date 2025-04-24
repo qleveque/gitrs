@@ -1,7 +1,8 @@
 use ratatui::widgets::ListState;
 
 use crate::{
-    config::{parse_gitrs_config, Config}, errors::Error
+    config::{parse_gitrs_config, Config},
+    errors::Error,
 };
 
 #[derive(Clone)]

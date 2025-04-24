@@ -10,7 +10,7 @@ use crate::show_app::ShowApp;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{ListState, StatefulWidget};
+use ratatui::widgets::StatefulWidget;
 
 use ratatui::Frame;
 use syntect::easy::HighlightLines;
@@ -45,22 +45,18 @@ pub struct BlameApp {
 }
 
 impl<'a> BlameApp {
-    pub fn new(
-        file: String,
-        revision: Option<String>,
-        line: usize,
-    ) -> Result<Self, Error> {
+    pub fn new(file: String, revision: Option<String>, line: usize) -> Result<Self, Error> {
         if !Path::new(&file).exists() {
             return Err(Error::GlobalError(
                 format!("file '{}' does not exist", file).to_string(),
             ));
         }
-        let mut list_state = ListState::default();
-        list_state.select(Some(line - 1));
         let revisions = vec![revision];
 
+        let mut state = AppState::new()?;
+        state.list_state.select(Some(line - 1));
         let mut instance = Self {
-            state: AppState::new()?,
+            state,
             file,
             blames: Vec::new(),
             code: Vec::new(),
@@ -70,7 +66,7 @@ impl<'a> BlameApp {
                 blame_list: List::default(),
                 code_list: List::default(),
                 max_blame_len: 0,
-            }
+            },
         };
         instance.reload()?;
         Ok(instance)
@@ -139,7 +135,7 @@ impl<'a> BlameApp {
                     Span::styled(commit.date.clone(), Style::from(Color::Blue)),
                     Span::raw(" "),
                     Span::styled(
-                        format!("{:>max_line_len$}", idx),
+                        format!("{:>max_line_len$}", idx + 1),
                         Style::from(Color::Yellow),
                     ),
                 ];
@@ -189,6 +185,10 @@ impl<'a> BlameApp {
 impl GitApp for BlameApp {
     fn state(&mut self) -> &mut AppState {
         &mut self.state
+    }
+
+    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
+        self.code.get(idx).map(|x| x.as_str())
     }
 
     fn reload(&mut self) -> Result<(), Error> {

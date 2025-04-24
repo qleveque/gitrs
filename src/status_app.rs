@@ -189,6 +189,13 @@ impl GitApp for StatusApp {
         &mut self.state
     }
 
+    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
+        match self.get_current_table().get(idx) {
+            Some((_, name)) => Some(&name),
+            None => None,
+        }
+    }
+
     fn reload(&mut self) -> Result<(), Error> {
         git_add_restore(&mut self.git_files, &self.state.config);
         parse_git_status(&mut self.git_files, &self.state.config)?;
@@ -288,10 +295,11 @@ impl GitApp for StatusApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-
         if self.tables_are_empty() {
             match action {
-                Action::Quit | Action::StageUnstageFile | Action::StageUnstageFiles => self.state.quit = true,
+                Action::Quit | Action::StageUnstageFile | Action::StageUnstageFiles => {
+                    self.state.quit = true
+                }
                 Action::Reload => self.reload()?,
                 _ => (),
             }

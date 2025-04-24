@@ -1,10 +1,20 @@
-use std::{io::stdout, process::{Command, Stdio}};
+use std::{
+    io::stdout,
+    process::{Command, Stdio},
+};
 
 use crossterm::{
-    event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect}, prelude::CrosstermBackend, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
+    layout::{Constraint, Direction, Layout, Rect},
+    prelude::CrosstermBackend,
+    style::{Color, Style},
+    text::{Line, Text},
+    widgets::{Block, Borders, Paragraph, Widget},
+    Frame, Terminal,
 };
 
 use crate::{
@@ -19,10 +29,8 @@ pub trait GitApp {
     fn on_exit(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    fn search_result(&mut self, _reversed: bool) -> Result<(), Error> {
-        Ok(())
-    }
     fn reload(&mut self) -> Result<(), Error>;
+    fn get_text_line(&mut self, _idx: usize) -> Option<&str>;
 
     fn state(&mut self) -> &mut AppState;
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
@@ -47,6 +55,35 @@ pub trait GitApp {
         self.notif(NotifType::Error, message);
     }
 
+    fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
+        reversed ^= self.state().search_reverse;
+
+        let mut idx = self
+            .state()
+            .list_state
+            .selected()
+            .ok_or_else(|| Error::StateIndexError)?;
+        let search_string = self.state().search_string.clone();
+        loop {
+            match reversed {
+                true => {
+                    if idx == 0 {
+                        return Err(Error::ReachedLastMachted);
+                    }
+                    idx -= 1;
+                }
+                false => idx += 1,
+            }
+            let line = self
+                .get_text_line(idx)
+                .ok_or_else(|| Error::ReachedLastMachted)?;
+            if line.contains(&search_string) {
+                self.state().list_state.select(Some(idx as usize));
+                return Ok(());
+            }
+        }
+    }
+
     fn display_search_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) {
         let search_string = if self.state().input_state == InputState::Search {
             match self.state().search_reverse {
@@ -54,7 +91,7 @@ pub trait GitApp {
                 true => format!("?{}|", self.state().search_string),
             }
         } else {
-          format!(" {}", self.state().search_string)
+            format!(" {}", self.state().search_string)
         };
         let title = match self.state().search_reverse {
             false => "Search",
@@ -83,13 +120,18 @@ pub trait GitApp {
     }
 
     fn display_notifications(&mut self, chunk: &mut Rect, frame: &mut Frame) {
-        let lines: Vec<Line> = self.state().notif.iter().map(|notif| {
-            let line_style = match notif.notif_type {
-                NotifType::Info => Style::from(Color::Blue),
-                NotifType::Error => Style::from(Color::Red),
-            };
-            Line::styled(notif.message.to_string(), line_style)
-        }).collect();
+        let lines: Vec<Line> = self
+            .state()
+            .notif
+            .iter()
+            .map(|notif| {
+                let line_style = match notif.notif_type {
+                    NotifType::Info => Style::from(Color::Blue),
+                    NotifType::Error => Style::from(Color::Red),
+                };
+                Line::styled(notif.message.to_string(), line_style)
+            })
+            .collect();
         let paragraph = Paragraph::new(Text::from(lines))
             .block(Block::default().borders(Borders::TOP).title("Messages"));
 
@@ -102,7 +144,6 @@ pub trait GitApp {
         *chunk = chunks[0];
     }
 
-
     fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -111,12 +152,14 @@ pub trait GitApp {
             terminal.draw(|mut frame| {
                 let mut chunk = frame.area();
 
-                if self.state().input_state == InputState::Search || !self.state().search_string.is_empty() {
+                if self.state().input_state == InputState::Search
+                    || !self.state().search_string.is_empty()
+                {
                     self.display_search_bar(&mut chunk, &mut frame);
-                } 
+                }
                 if self.state().input_state == InputState::Command {
                     self.display_cmd_line(&mut chunk, &mut frame);
-                } 
+                }
                 if !self.state().notif.is_empty() {
                     self.display_notifications(&mut chunk, &mut frame);
                 }
@@ -127,7 +170,7 @@ pub trait GitApp {
                 Err(err) => {
                     self.error(&err.to_string());
                     None
-                },
+                }
                 Ok(opt_action) => opt_action,
             };
 
@@ -163,13 +206,13 @@ pub trait GitApp {
                         let command_string = self.state().command_string.clone();
                         self.state().command_string.clear();
                         return Ok(Some(command_string.parse::<Action>()?));
-                    },
+                    }
                     InputState::Search => {
                         return Ok(Some(Action::NextSearchResult));
-                    },
+                    }
                     InputState::App => (),
-                } 
-            },
+                }
+            }
             KeyCode::Esc => {
                 match input_state {
                     InputState::Search => self.state().search_string.clear(),
@@ -177,21 +220,25 @@ pub trait GitApp {
                     InputState::App => (),
                 }
                 self.state().input_state = InputState::App;
-            },
+            }
             KeyCode::Backspace => {
                 match input_state {
-                    InputState::Search => {self.state().search_string.pop();},
-                    InputState::Command => {self.state().command_string.pop();},
+                    InputState::Search => {
+                        self.state().search_string.pop();
+                    }
+                    InputState::Command => {
+                        self.state().command_string.pop();
+                    }
                     InputState::App => (),
                 };
-            },
+            }
             KeyCode::Char(c) => {
                 match input_state {
                     InputState::Search => self.state().search_string.push(c),
                     InputState::Command => self.state().command_string.push(c),
                     InputState::App => (),
                 };
-            },
+            }
             _ => {
                 self.error("error: this char is not handled yet");
             }
@@ -222,7 +269,6 @@ pub trait GitApp {
             key_str = format!("<{}>", key_str).to_string();
         }
         self.state().key_combination.push_str(&key_str);
-
 
         // Compute command to run from config
         let keys = self.state().key_combination.clone();
@@ -274,7 +320,11 @@ pub trait GitApp {
             Action::HalfPageUp => self.state().list_state.scroll_up_by(height as u16 / 3),
             Action::HalfPageDown => self.state().list_state.scroll_down_by(height as u16 / 3),
             Action::CenterVertically => {
-                let mut idx = self.state().list_state.selected().ok_or_else(|| Error::StateIndexError)?;
+                let mut idx = self
+                    .state()
+                    .list_state
+                    .selected()
+                    .ok_or_else(|| Error::StateIndexError)?;
                 if idx > height / 2 {
                     idx = idx - height / 2;
                     *self.state().list_state.offset_mut() = idx;
@@ -290,12 +340,12 @@ pub trait GitApp {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = false;
                 self.state().input_state = InputState::Search;
-            },
+            }
             Action::SearchReverse => {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = true;
                 self.state().input_state = InputState::Search;
-            },
+            }
             Action::TypeCommand => self.state().input_state = InputState::Command,
             Action::NextSearchResult => self.search_result(false)?,
             Action::PreviousSearchResult => self.search_result(true)?,
@@ -322,10 +372,11 @@ pub trait GitApp {
     }
 
     fn handle_user_input(&mut self) -> Result<Option<Action>, Error> {
-
         let key_event = match Self::press_key()? {
             Some(key_event) => key_event,
-            None => { return Ok(None); },
+            None => {
+                return Ok(None);
+            }
         };
         self.state().notif = Vec::new();
 
