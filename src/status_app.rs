@@ -287,7 +287,11 @@ impl GitApp for StatusApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        Ok((Some(self.get_filename()?), Some("HEAD".to_string())))
+        let filename = match self.get_filename() {
+            Ok(filename) => Some(filename),
+            Err(_) => None,
+        };
+        Ok((filename, Some("HEAD".to_string())))
     }
 
     fn run_action(
@@ -295,17 +299,6 @@ impl GitApp for StatusApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        if self.tables_are_empty() {
-            match action {
-                Action::Quit | Action::StageUnstageFile | Action::StageUnstageFiles => {
-                    self.state.quit = true
-                }
-                Action::Reload => self.reload()?,
-                _ => (),
-            }
-            return Ok(());
-        }
-
         match action {
             Action::StageUnstageFile => {
                 let mut git_file = self.git_files.get_mut(&self.get_filename()?).unwrap();

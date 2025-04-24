@@ -37,7 +37,8 @@ pub struct ShowApp {
 impl ShowApp {
     pub fn new(revision: Option<String>) -> Result<Self, Error> {
         let mut state = AppState::new()?;
-        set_git_dir(&state.config); // TODO: is it necessary
+        let original_dir = env::current_dir()?;
+        set_git_dir(&state.config);
 
         let output = git_show_output(&revision, &state.config);
         let mut lines = output.lines().map(String::from);
@@ -51,7 +52,7 @@ impl ShowApp {
         let mut r = Self {
             state,
             commit,
-            original_dir: env::current_dir()?,
+            original_dir,
             view_model: ShowAppViewModel {
                 file_list: List::default(),
                 commit_paragraph: Paragraph::default(),
