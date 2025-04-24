@@ -49,69 +49,79 @@ pub trait GitApp {
         self.notif(NotifType::Error, message);
     }
 
+    fn display_search_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) {
+        let search_string = if self.state().input_state == InputState::Search {
+            match self.state().search_reverse {
+                false => format!("/{}|", self.state().search_string),
+                true => format!("?{}|", self.state().search_string),
+            }
+        } else {
+          format!(" {}", self.state().search_string)
+        };
+        let title = match self.state().search_reverse {
+            false => "Search",
+            true => "Search (rev)",
+        };
+        let paragraph = Paragraph::new(search_string)
+            .block(Block::default().borders(Borders::TOP).title(title));
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(2)])
+            .split(*chunk);
+        Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+        *chunk = chunks[0];
+    }
+
+    fn display_cmd_line(&mut self, chunk: &mut Rect, frame: &mut Frame) {
+        let command_string = format!(":{}│", self.state().command_string);
+        let paragraph = Paragraph::new(command_string)
+            .block(Block::default().borders(Borders::TOP).title("Command"));
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(2)])
+            .split(*chunk);
+        Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+        *chunk = chunks[0];
+    }
+
+    fn display_notifications(&mut self, chunk: &mut Rect, frame: &mut Frame) {
+        let lines: Vec<Line> = self.state().notif.iter().map(|notif| {
+            let line_style = match notif.notif_type {
+                NotifType::Info => Style::from(Color::Blue),
+                NotifType::Error => Style::from(Color::Red),
+            };
+            Line::styled(notif.message.to_string(), line_style)
+        }).collect();
+        let paragraph = Paragraph::new(Text::from(lines))
+            .block(Block::default().borders(Borders::TOP).title("Messages"));
+
+        let len = self.state().notif.len() as u16 + 1;
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(len)])
+            .split(*chunk);
+        Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+        *chunk = chunks[0];
+    }
+
+
     fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         loop {
-            terminal.draw(|frame| {
+            terminal.draw(|mut frame| {
                 let mut chunk = frame.area();
 
                 if self.state().input_state == InputState::Search || !self.state().search_string.is_empty() {
-                    let search_string = if self.state().input_state == InputState::Search {
-                        match self.state().search_reverse {
-                            false => format!("/{}|", self.state().search_string),
-                            true => format!("?{}|", self.state().search_string),
-                        }
-                    } else {
-                      format!(" {}", self.state().search_string)
-                    };
-                    let title = match self.state().search_reverse {
-                        false => "Search",
-                        true => "Search (rev)",
-                    };
-                    let paragraph = Paragraph::new(search_string)
-                        .block(Block::default().borders(Borders::TOP).title(title));
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(0), Constraint::Length(2)])
-                        .split(chunk);
-                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
-                    chunk = chunks[0];
+                    self.display_search_bar(&mut chunk, &mut frame);
                 } 
-
                 if self.state().input_state == InputState::Command {
-                    let command_string = format!(":{}│", self.state().command_string);
-                    let paragraph = Paragraph::new(command_string)
-                        .block(Block::default().borders(Borders::TOP).title("Command"));
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(0), Constraint::Length(2)])
-                        .split(chunk);
-                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
-                    chunk = chunks[0];
+                    self.display_cmd_line(&mut chunk, &mut frame);
                 } 
-
                 if !self.state().notif.is_empty() {
-                    let lines: Vec<Line> = self.state().notif.iter().map(|notif| {
-                        let line_style = match notif.notif_type {
-                            NotifType::Info => Style::from(Color::Blue),
-                            NotifType::Error => Style::from(Color::Red),
-                        };
-                        Line::styled(notif.message.to_string(), line_style)
-                    }).collect();
-                    let paragraph = Paragraph::new(Text::from(lines))
-                        .block(Block::default().borders(Borders::TOP).title("Messages"));
-
-                    let len = self.state().notif.len() as u16 + 1;
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(0), Constraint::Length(len)])
-                        .split(chunk);
-                    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
-                    chunk = chunks[0];
+                    self.display_notifications(&mut chunk, &mut frame);
                 }
-
                 self.draw(frame, chunk);
             })?;
 
@@ -143,7 +153,6 @@ pub trait GitApp {
 
         Ok(())
     }
-
 
     fn handle_line_edited(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
         let input_state = self.state().input_state.clone();
