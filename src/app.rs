@@ -349,6 +349,7 @@ pub trait GitApp {
             Action::TypeCommand => self.state().input_state = InputState::Command,
             Action::NextSearchResult => self.search_result(false)?,
             Action::PreviousSearchResult => self.search_result(true)?,
+            Action::GoTo(line) => self.state().list_state.select(Some(*line)),
             Action::None => (),
             action => {
                 return Err(Error::GlobalError(format!(

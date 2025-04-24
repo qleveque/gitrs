@@ -26,6 +26,7 @@ pub enum Action {
     PreviousSearchResult,
     TypeCommand,
     Command(CommandType, String),
+    GoTo(usize),
     StageUnstageFile,
     StageUnstageFiles,
     SwitchView,
@@ -66,6 +67,11 @@ impl FromStr for Action {
             "previous_commit_blame" => Ok(Action::PreviousCommitBlame),
             "nop" => Ok(Action::None),
             cmd => {
+                if let Ok(number) = cmd.parse::<usize>() {
+                    if number > 0 {
+                        return Ok(Action::GoTo(number - 1));
+                    }
+                }
                 let command_type = match cmd.chars().next() {
                     Some('!') => CommandType::Sync,
                     Some('>') => CommandType::SyncQuit,
