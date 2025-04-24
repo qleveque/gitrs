@@ -1,3 +1,5 @@
+use ratatui::widgets::ListState;
+
 use crate::{
     config::{parse_gitrs_config, Config}, errors::Error
 };
@@ -30,6 +32,7 @@ pub struct AppState {
     pub search_reverse: bool,
     pub command_string: String,
     pub input_state: InputState,
+    pub list_state: ListState,
 }
 
 impl AppState {
@@ -43,6 +46,7 @@ impl AppState {
             search_reverse: false,
             command_string: "".to_string(),
             input_state: InputState::App,
+            list_state: ListState::default(),
         };
         return Ok(r);
     }

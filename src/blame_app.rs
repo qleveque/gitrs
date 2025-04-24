@@ -29,14 +29,13 @@ use syntect::util::LinesWithEndings;
 use std::path::Path;
 
 pub struct BlameApp<'a> {
-    app_state: AppState,
+    state: AppState,
     file: String,
     blames: Vec<Option<CommitRef>>,
     code: Vec<String>,
     height: usize,
     blame_list: List<'a>,
     code_list: List<'a>,
-    state: ListState,
     max_blame_len: usize,
     revisions: Vec<Option<String>>,
 }
@@ -52,18 +51,18 @@ impl<'a> BlameApp<'a> {
                 format!("file '{}' does not exist", file).to_string(),
             ));
         }
-        let mut state = ListState::default();
-        state.select(Some(line - 1));
+        let mut list_state = ListState::default();
+        list_state.select(Some(line - 1));
         let revisions = vec![revision];
+
         let mut instance = Self {
-            app_state: AppState::new()?,
+            state: AppState::new()?,
             file,
             blames: Vec::new(),
             code: Vec::new(),
             height: 0,
             blame_list: List::default(),
             code_list: List::default(),
-            state,
             max_blame_len: 0,
             revisions,
         };
@@ -182,8 +181,8 @@ impl<'a> BlameApp<'a> {
 }
 
 impl GitApp for BlameApp<'_> {
-    fn get_state(&mut self) -> &mut AppState {
-        &mut self.app_state
+    fn state(&mut self) -> &mut AppState {
+        &mut self.state
     }
 
     fn reload(&mut self) -> Result<(), Error> {
@@ -192,7 +191,7 @@ impl GitApp for BlameApp<'_> {
             .last()
             .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?;
         let (new_blames, new_code) =
-            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.app_state.config)?;
+            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.state.config)?;
         if new_blames.len() == 0 {
             self.revisions.pop();
             return Ok(());
@@ -229,7 +228,7 @@ impl GitApp for BlameApp<'_> {
             .block(Block::default())
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(self.app_state.config.scroll_off);
+            .scroll_padding(self.state.config.scroll_off);
 
         let code_items: Vec<ListItem> = self
             .highlighted_lines()?
@@ -240,13 +239,13 @@ impl GitApp for BlameApp<'_> {
             .block(Block::default().borders(Borders::LEFT))
             .style(Style::from(Color::White))
             .highlight_style(Style::from(Color::Black).bg(Color::Gray))
-            .scroll_padding(self.app_state.config.scroll_off);
+            .scroll_padding(self.state.config.scroll_off);
 
-        match self.state.selected() {
-            None => self.state.select(Some(len - 1)),
+        match self.state().list_state.selected() {
+            None => self.state().list_state.select(Some(len - 1)),
             Some(idx) => {
                 if idx >= len {
-                    self.state.select(Some(len - 1));
+                    self.state().list_state.select(Some(len - 1));
                 }
             }
         }
@@ -268,14 +267,14 @@ impl GitApp for BlameApp<'_> {
             &self.blame_list,
             chunks[0],
             frame.buffer_mut(),
-            &mut self.state,
+            &mut self.state.list_state,
         );
 
         StatefulWidget::render(
             &self.code_list,
             chunks[1],
             frame.buffer_mut(),
-            &mut self.state,
+            &mut self.state.list_state,
         );
     }
 
@@ -286,6 +285,7 @@ impl GitApp for BlameApp<'_> {
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
         let rev = self
             .state
+            .list_state
             .selected()
             .and_then(|idx| self.blames.get(idx))
             .and_then(|opt_commit| opt_commit.as_ref().map(|commit| commit.hash.clone()));
@@ -308,6 +308,7 @@ impl GitApp for BlameApp<'_> {
             Action::PreviousCommitBlame => {
                 let idx = self
                     .state
+                    .list_state
                     .selected()
                     .ok_or_else(|| Error::StateIndexError)?;
                 let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
@@ -325,6 +326,7 @@ impl GitApp for BlameApp<'_> {
             Action::ShowCommit => {
                 let commit_ref = self
                     .state
+                    .list_state
                     .selected()
                     .and_then(|idx| self.blames.get(idx))
                     .and_then(|opt| opt.as_ref());
@@ -341,9 +343,7 @@ impl GitApp for BlameApp<'_> {
                 };
             }
             _ => {
-                let mut new_state = self.state.clone();
-                self.run_generic_action(action, self.height, terminal, &mut new_state)?;
-                self.state = new_state;
+                self.run_generic_action(action, self.height, terminal)?;
                 return Ok(());
             }
         };

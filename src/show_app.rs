@@ -8,7 +8,7 @@ use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileSta
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{ListState, Paragraph, StatefulWidget, Widget};
+use ratatui::widgets::{Paragraph, StatefulWidget, Widget};
 
 use ratatui::Frame;
 use ratatui::{
@@ -22,22 +22,21 @@ use ratatui::{
 use std::env;
 
 pub struct ShowApp {
-    app_state: AppState,
+    state: AppState,
     commit: Commit,
     files: Vec<(FileStatus, String)>,
     file_list: List<'static>,
     commit_paragraph: Paragraph<'static>,
-    state: ListState,
     files_height: usize,
     original_dir: std::path::PathBuf,
 }
 
 impl ShowApp {
     pub fn new(revision: Option<String>) -> Result<Self, Error> {
-        let app_state = AppState::new()?;
-        set_git_dir(&app_state.config); // TODO: is it necessary
+        let mut state = AppState::new()?;
+        set_git_dir(&state.config); // TODO: is it necessary
 
-        let output = git_show_output(&revision, &app_state.config);
+        let output = git_show_output(&revision, &state.config);
         let mut lines = output.lines().map(String::from);
         let (commit, _) = git_parse_commit(&mut lines);
 
@@ -62,21 +61,18 @@ impl ShowApp {
             .block(Block::default().borders(Borders::NONE))
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(app_state.config.scroll_off);
+            .scroll_padding(state.config.scroll_off);
 
         let metadata = Self::display_commit_metadata(commit.metadata.clone());
         let commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
 
-        let mut state = ListState::default();
-        state.select_first();
-
+        state.list_state.select_first();
         let r = Self {
-            app_state,
+            state,
             commit,
             files,
             file_list,
             commit_paragraph,
-            state,
             files_height: 0,
             original_dir: env::current_dir()?,
         };
@@ -109,15 +105,15 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
-    fn get_state(&mut self) -> &mut AppState {
-        &mut self.app_state
+    fn state(&mut self) -> &mut AppState {
+        &mut self.state
     }
 
-    fn search_result(&mut self, state: &mut ListState, mut reversed: bool) -> Result<(), Error> {
-        reversed ^= self.get_state().search_reverse;
+    fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
+        reversed ^= self.state().search_reverse;
 
-        let mut idx = state.selected().ok_or_else(|| Error::StateIndexError)?;
-        let search_string = self.get_state().search_string.clone();
+        let mut idx = self.state().list_state.selected().ok_or_else(|| Error::StateIndexError)?;
+        let search_string = self.state().search_string.clone();
         loop {
             match reversed {
                 true => {
@@ -131,7 +127,7 @@ impl GitApp for ShowApp {
             let tuple = self.files.get(idx as usize).ok_or_else(|| Error::ReachedLastMachted)?;
             let filename: String = tuple.1.clone();
             if filename.contains(&search_string) {
-                state.select(Some(idx as usize));
+                self.state().list_state.select(Some(idx as usize));
                 return Ok(());
             }
         }
@@ -155,7 +151,7 @@ impl GitApp for ShowApp {
             &self.file_list,
             chunks[1],
             frame.buffer_mut(),
-            &mut self.state,
+            &mut self.state.list_state,
         );
         self.files_height = chunks[1].height as usize;
     }
@@ -165,7 +161,7 @@ impl GitApp for ShowApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        let idx = self.state.selected().ok_or_else(|| Error::StateIndexError)?;
+        let idx = self.state.list_state.selected().ok_or_else(|| Error::StateIndexError)?;
         let file = self.files.get(idx).ok_or_else(|| Error::StateIndexError)?;
         let rev = Some(self.commit.hash.clone());
         Ok((Some(file.1.clone()), rev))
@@ -176,9 +172,7 @@ impl GitApp for ShowApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        let mut new_state = self.state.clone();
-        self.run_generic_action(action, self.files_height, terminal, &mut new_state)?;
-        self.state = new_state;
+        self.run_generic_action(action, self.files_height, terminal)?;
         return Ok(());
     }
 }

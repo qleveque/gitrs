@@ -4,7 +4,7 @@ use crossterm::{
     event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect}, prelude::CrosstermBackend, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, ListState, Paragraph, Widget}, Frame, Terminal
+    layout::{Constraint, Direction, Layout, Rect}, prelude::CrosstermBackend, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
 };
 
 use crate::{
@@ -22,11 +22,11 @@ pub trait GitApp {
     fn reload(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    fn search_result(&mut self, _state: &mut ListState, _reversed: bool) -> Result<(), Error> {
+    fn search_result(&mut self, _reversed: bool) -> Result<(), Error> {
         Ok(())
     }
 
-    fn get_state(&mut self) -> &mut AppState;
+    fn state(&mut self) -> &mut AppState;
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error>;
 
@@ -37,7 +37,7 @@ pub trait GitApp {
     ) -> Result<(), Error>;
 
     fn notif(&mut self, notif_type: NotifType, message: &str) {
-        self.get_state().notif.push(Notif {
+        self.state().notif.push(Notif {
             notif_type,
             message: message.to_string(),
         });
@@ -57,16 +57,16 @@ pub trait GitApp {
             terminal.draw(|frame| {
                 let mut chunk = frame.area();
 
-                if self.get_state().input_state == InputState::Search || !self.get_state().search_string.is_empty() {
-                    let search_string = if self.get_state().input_state == InputState::Search {
-                        match self.get_state().search_reverse {
-                            false => format!("/{}|", self.get_state().search_string),
-                            true => format!("?{}|", self.get_state().search_string),
+                if self.state().input_state == InputState::Search || !self.state().search_string.is_empty() {
+                    let search_string = if self.state().input_state == InputState::Search {
+                        match self.state().search_reverse {
+                            false => format!("/{}|", self.state().search_string),
+                            true => format!("?{}|", self.state().search_string),
                         }
                     } else {
-                      format!(" {}", self.get_state().search_string)
+                      format!(" {}", self.state().search_string)
                     };
-                    let title = match self.get_state().search_reverse {
+                    let title = match self.state().search_reverse {
                         false => "Search",
                         true => "Search (rev)",
                     };
@@ -80,8 +80,8 @@ pub trait GitApp {
                     chunk = chunks[0];
                 } 
 
-                if self.get_state().input_state == InputState::Command {
-                    let command_string = format!(":{}│", self.get_state().command_string);
+                if self.state().input_state == InputState::Command {
+                    let command_string = format!(":{}│", self.state().command_string);
                     let paragraph = Paragraph::new(command_string)
                         .block(Block::default().borders(Borders::TOP).title("Command"));
                     let chunks = Layout::default()
@@ -92,8 +92,8 @@ pub trait GitApp {
                     chunk = chunks[0];
                 } 
 
-                if !self.get_state().notif.is_empty() {
-                    let lines: Vec<Line> = self.get_state().notif.iter().map(|notif| {
+                if !self.state().notif.is_empty() {
+                    let lines: Vec<Line> = self.state().notif.iter().map(|notif| {
                         let line_style = match notif.notif_type {
                             NotifType::Info => Style::from(Color::Blue),
                             NotifType::Error => Style::from(Color::Red),
@@ -103,7 +103,7 @@ pub trait GitApp {
                     let paragraph = Paragraph::new(Text::from(lines))
                         .block(Block::default().borders(Borders::TOP).title("Messages"));
 
-                    let len = self.get_state().notif.len() as u16 + 1;
+                    let len = self.state().notif.len() as u16 + 1;
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints([Constraint::Min(0), Constraint::Length(len)])
@@ -128,14 +128,14 @@ pub trait GitApp {
                     Err(err) => self.error(&err.to_string()),
                     Ok(()) => (),
                 }
-                if self.get_state().quit {
+                if self.state().quit {
                     break;
                 }
             }
 
             // display key combination if multiple letters
-            let key_combination = self.get_state().key_combination.clone();
-            if self.get_state().notif.is_empty() && !key_combination.is_empty() {
+            let key_combination = self.state().key_combination.clone();
+            if self.state().notif.is_empty() && !key_combination.is_empty() {
                 self.info(&format!("Keys: {}", key_combination));
             }
         }
@@ -146,15 +146,15 @@ pub trait GitApp {
 
 
     fn handle_line_edited(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
-        let input_state = self.get_state().input_state.clone();
+        let input_state = self.state().input_state.clone();
         match key_event.code {
             KeyCode::Enter => {
                 // Return :command action if any
-                self.get_state().input_state = InputState::App;
+                self.state().input_state = InputState::App;
                 match input_state {
                     InputState::Command => {
-                        let command_string = self.get_state().command_string.clone();
-                        self.get_state().command_string.clear();
+                        let command_string = self.state().command_string.clone();
+                        self.state().command_string.clear();
                         return Ok(Some(command_string.parse::<Action>()?));
                     },
                     InputState::Search => {
@@ -165,23 +165,23 @@ pub trait GitApp {
             },
             KeyCode::Esc => {
                 match input_state {
-                    InputState::Search => self.get_state().search_string.clear(),
-                    InputState::Command => self.get_state().command_string.clear(),
+                    InputState::Search => self.state().search_string.clear(),
+                    InputState::Command => self.state().command_string.clear(),
                     InputState::App => (),
                 }
-                self.get_state().input_state = InputState::App;
+                self.state().input_state = InputState::App;
             },
             KeyCode::Backspace => {
                 match input_state {
-                    InputState::Search => {self.get_state().search_string.pop();},
-                    InputState::Command => {self.get_state().command_string.pop();},
+                    InputState::Search => {self.state().search_string.pop();},
+                    InputState::Command => {self.state().command_string.pop();},
                     InputState::App => (),
                 };
             },
             KeyCode::Char(c) => {
                 match input_state {
-                    InputState::Search => self.get_state().search_string.push(c),
-                    InputState::Command => self.get_state().command_string.push(c),
+                    InputState::Search => self.state().search_string.push(c),
+                    InputState::Command => self.state().command_string.push(c),
                     InputState::App => (),
                 };
             },
@@ -214,16 +214,16 @@ pub trait GitApp {
         } else if key_str.len() > 1 {
             key_str = format!("<{}>", key_str).to_string();
         }
-        self.get_state().key_combination.push_str(&key_str);
+        self.state().key_combination.push_str(&key_str);
 
 
         // Compute command to run from config
-        let keys = self.get_state().key_combination.clone();
+        let keys = self.state().key_combination.clone();
         if keys == "" {
             return Ok(None);
         }
 
-        let bindings = self.get_state().config.bindings.clone();
+        let bindings = self.state().config.bindings.clone();
 
         let mut potential = false;
         for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
@@ -236,7 +236,7 @@ pub trait GitApp {
                         continue;
                     }
                     if *key_combination == keys {
-                        self.get_state().key_combination.clear();
+                        self.state().key_combination.clear();
                         return Ok(Some(action.clone()));
                     }
                     if key_combination.starts_with(&keys) {
@@ -246,7 +246,7 @@ pub trait GitApp {
             }
         }
         if !potential {
-            self.get_state().key_combination.clear();
+            self.state().key_combination.clear();
         }
         Ok(None)
     }
@@ -256,24 +256,23 @@ pub trait GitApp {
         action: &Action,
         height: usize,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-        state: &mut ListState,
     ) -> Result<(), Error> {
         match action {
             Action::Reload => self.reload()?,
-            Action::Up => state.select_previous(),
-            Action::Down => state.select_next(),
-            Action::First => state.select_first(),
-            Action::Last => state.select_last(),
-            Action::Quit => self.get_state().quit = true,
-            Action::HalfPageUp => state.scroll_up_by(height as u16 / 3),
-            Action::HalfPageDown => state.scroll_down_by(height as u16 / 3),
+            Action::Up => self.state().list_state.select_previous(),
+            Action::Down => self.state().list_state.select_next(),
+            Action::First => self.state().list_state.select_first(),
+            Action::Last => self.state().list_state.select_last(),
+            Action::Quit => self.state().quit = true,
+            Action::HalfPageUp => self.state().list_state.scroll_up_by(height as u16 / 3),
+            Action::HalfPageDown => self.state().list_state.scroll_down_by(height as u16 / 3),
             Action::CenterVertically => {
-                let mut idx = state.selected().ok_or_else(|| Error::StateIndexError)?;
-                *state = if idx > height / 2 {
+                let mut idx = self.state().list_state.selected().ok_or_else(|| Error::StateIndexError)?;
+                if idx > height / 2 {
                     idx = idx - height / 2;
-                    state.clone().with_offset(idx)
+                    *self.state().list_state.offset_mut() = idx;
                 } else {
-                    state.clone().with_offset(0)
+                    *self.state().list_state.offset_mut() = 0;
                 };
             }
             Action::Command(command_type, command) => {
@@ -281,18 +280,18 @@ pub trait GitApp {
                 self.run_command(terminal, &command_type, command.to_string(), file, rev)?;
             }
             Action::Search => {
-                self.get_state().search_string = "".to_string();
-                self.get_state().search_reverse = false;
-                self.get_state().input_state = InputState::Search;
+                self.state().search_string = "".to_string();
+                self.state().search_reverse = false;
+                self.state().input_state = InputState::Search;
             },
             Action::SearchReverse => {
-                self.get_state().search_string = "".to_string();
-                self.get_state().search_reverse = true;
-                self.get_state().input_state = InputState::Search;
+                self.state().search_string = "".to_string();
+                self.state().search_reverse = true;
+                self.state().input_state = InputState::Search;
             },
-            Action::TypeCommand => self.get_state().input_state = InputState::Command,
-            Action::NextSearchResult => self.search_result(state, false)?,
-            Action::PreviousSearchResult => self.search_result(state, true)?,
+            Action::TypeCommand => self.state().input_state = InputState::Command,
+            Action::NextSearchResult => self.search_result(false)?,
+            Action::PreviousSearchResult => self.search_result(true)?,
             Action::None => (),
             action => {
                 return Err(Error::GlobalError(format!(
@@ -321,9 +320,9 @@ pub trait GitApp {
             Some(key_event) => key_event,
             None => { return Ok(None); },
         };
-        self.get_state().notif = Vec::new();
+        self.state().notif = Vec::new();
 
-        let input_state = self.get_state().input_state.clone();
+        let input_state = self.state().input_state.clone();
         if input_state == InputState::App {
             Ok(self.handle_key_event(key_event)?)
         } else {
@@ -372,7 +371,7 @@ pub trait GitApp {
         }
 
         match command_type {
-            CommandType::SyncQuit => self.get_state().quit = true,
+            CommandType::SyncQuit => self.state().quit = true,
             CommandType::Sync => self.reload()?,
             _ => (),
         }
