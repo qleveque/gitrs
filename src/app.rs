@@ -19,12 +19,10 @@ pub trait GitApp {
     fn on_exit(&mut self) -> Result<(), Error> {
         Ok(())
     }
-    fn reload(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
     fn search_result(&mut self, _reversed: bool) -> Result<(), Error> {
         Ok(())
     }
+    fn reload(&mut self) -> Result<(), Error>;
 
     fn state(&mut self) -> &mut AppState;
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;

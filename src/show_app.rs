@@ -41,7 +41,8 @@ impl ShowApp {
 
         let output = git_show_output(&revision, &state.config);
         let mut lines = output.lines().map(String::from);
-        let (commit, _) = git_parse_commit(&mut lines);
+        let (mut commit, _) = git_parse_commit(&mut lines);
+        commit.files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
         state.list_state.select_first();
 
@@ -55,35 +56,8 @@ impl ShowApp {
                 files_height: 0,
             },
         };
-        r.compute_view_model();
+        r.reload()?;
         return Ok(r);
-    }
-
-    fn compute_view_model(&mut self) {
-        let mut files = self.commit.files.clone();
-        files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-        let file_items: Vec<ListItem> = files
-            .iter()
-            .map(|(status, name)| {
-                let label = format!("{} {}", status.character(), name);
-                let color = match status {
-                    FileStatus::New => Color::Green,
-                    FileStatus::Deleted => Color::Red,
-                    FileStatus::Modified => Color::LightBlue,
-                    _ => Color::default(),
-                };
-                ListItem::new(label).style(Style::from(color))
-            })
-            .collect();
-
-        self.view_model.file_list = List::new(file_items)
-            .block(Block::default().borders(Borders::NONE))
-            .style(Style::from(Color::White))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(self.state.config.scroll_off);
-
-        let metadata = Self::display_commit_metadata(self.commit.metadata.clone());
-        self.view_model.commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
     }
 
     fn display_commit_metadata<'b>(metadata: String) -> Paragraph<'b> {
@@ -112,6 +86,32 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
+
+    fn reload(&mut self) -> Result<(), Error> {
+        let file_items: Vec<ListItem> = self.commit.files
+            .iter()
+            .map(|(status, name)| {
+                let label = format!("{} {}", status.character(), name);
+                let color = match status {
+                    FileStatus::New => Color::Green,
+                    FileStatus::Deleted => Color::Red,
+                    FileStatus::Modified => Color::LightBlue,
+                    _ => Color::default(),
+                };
+                ListItem::new(label).style(Style::from(color))
+            })
+            .collect();
+
+        self.view_model.file_list = List::new(file_items)
+            .block(Block::default().borders(Borders::NONE))
+            .style(Style::from(Color::White))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            .scroll_padding(self.state.config.scroll_off);
+
+        let metadata = Self::display_commit_metadata(self.commit.metadata.clone());
+        self.view_model.commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
+        Ok(())
+    }
 
     fn state(&mut self) -> &mut AppState {
         &mut self.state

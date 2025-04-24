@@ -28,19 +28,23 @@ use syntect::util::LinesWithEndings;
 
 use std::path::Path;
 
-pub struct BlameApp<'a> {
+pub struct BlameAppViewModel {
+    height: usize,
+    blame_list: List<'static>,
+    code_list: List<'static>,
+    max_blame_len: usize,
+}
+
+pub struct BlameApp {
     state: AppState,
     file: String,
     blames: Vec<Option<CommitRef>>,
     code: Vec<String>,
-    height: usize,
-    blame_list: List<'a>,
-    code_list: List<'a>,
-    max_blame_len: usize,
     revisions: Vec<Option<String>>,
+    view_model: BlameAppViewModel,
 }
 
-impl<'a> BlameApp<'a> {
+impl<'a> BlameApp {
     pub fn new(
         file: String,
         revision: Option<String>,
@@ -60,11 +64,13 @@ impl<'a> BlameApp<'a> {
             file,
             blames: Vec::new(),
             code: Vec::new(),
-            height: 0,
-            blame_list: List::default(),
-            code_list: List::default(),
-            max_blame_len: 0,
             revisions,
+            view_model: BlameAppViewModel {
+                height: 0,
+                blame_list: List::default(),
+                code_list: List::default(),
+                max_blame_len: 0,
+            }
         };
         instance.reload()?;
         Ok(instance)
@@ -180,7 +186,7 @@ impl<'a> BlameApp<'a> {
     }
 }
 
-impl GitApp for BlameApp<'_> {
+impl GitApp for BlameApp {
     fn state(&mut self) -> &mut AppState {
         &mut self.state
     }
@@ -222,9 +228,9 @@ impl GitApp for BlameApp<'_> {
                 ListItem::new(display)
             })
             .collect();
-        self.max_blame_len = max_blame_len;
+        self.view_model.max_blame_len = max_blame_len;
 
-        self.blame_list = List::new(blame_items)
+        self.view_model.blame_list = List::new(blame_items)
             .block(Block::default())
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
@@ -235,7 +241,7 @@ impl GitApp for BlameApp<'_> {
             .iter()
             .map(|line| ListItem::new(line.clone()))
             .collect();
-        self.code_list = List::new(code_items)
+        self.view_model.code_list = List::new(code_items)
             .block(Block::default().borders(Borders::LEFT))
             .style(Style::from(Color::White))
             .highlight_style(Style::from(Color::Black).bg(Color::Gray))
@@ -253,25 +259,25 @@ impl GitApp for BlameApp<'_> {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        self.height = rect.height as usize;
+        self.view_model.height = rect.height as usize;
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(self.max_blame_len as u16),
+                Constraint::Length(self.view_model.max_blame_len as u16),
                 Constraint::Min(0),
             ])
             .split(rect);
 
         StatefulWidget::render(
-            &self.blame_list,
+            &self.view_model.blame_list,
             chunks[0],
             frame.buffer_mut(),
             &mut self.state.list_state,
         );
 
         StatefulWidget::render(
-            &self.code_list,
+            &self.view_model.code_list,
             chunks[1],
             frame.buffer_mut(),
             &mut self.state.list_state,
@@ -343,7 +349,7 @@ impl GitApp for BlameApp<'_> {
                 };
             }
             _ => {
-                self.run_generic_action(action, self.height, terminal)?;
+                self.run_generic_action(action, self.view_model.height, terminal)?;
                 return Ok(());
             }
         };

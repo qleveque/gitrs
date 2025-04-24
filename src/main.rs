@@ -7,6 +7,7 @@ mod git;
 mod show_app;
 mod status_app;
 mod app_state;
+mod view_list;
 
 use std::io::{self, stdout};
 
