@@ -160,10 +160,7 @@ impl StatusApp {
     }
 
     fn get_filename(&self) -> Result<String, Error> {
-        let idx = match self.state.list_state.selected() {
-            Some(idx) => idx,
-            None => return Err(Error::StateIndexError),
-        };
+        let idx = self.idx()?;
         let filename = match self.get_current_table().get(idx) {
             Some((_, filename)) => filename,
             None => return Err(Error::StateIndexError),

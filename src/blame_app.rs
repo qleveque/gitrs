@@ -312,11 +312,7 @@ impl GitApp for BlameApp {
                 self.reload()?;
             }
             Action::PreviousCommitBlame => {
-                let idx = self
-                    .state
-                    .list_state
-                    .selected()
-                    .ok_or_else(|| Error::StateIndexError)?;
+                let idx = self.idx()?;
                 let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
                 let rev = if let Some(commit) = commit_ref {
                     if let Some('^') = commit.hash.chars().next() {

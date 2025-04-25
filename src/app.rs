@@ -3,6 +3,8 @@ use std::{
     process::{Command, Stdio},
 };
 
+use regex::RegexBuilder;
+
 use crossterm::{
     event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
@@ -33,6 +35,12 @@ pub trait GitApp {
     fn get_text_line(&mut self, _idx: usize) -> Option<&str>;
 
     fn state(&mut self) -> &mut AppState;
+    fn idx(&mut self) -> Result<usize, Error> {
+        self.state()
+            .list_state
+            .selected()
+            .ok_or_else(|| Error::StateIndexError)
+    }
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error>;
 
@@ -58,12 +66,14 @@ pub trait GitApp {
     fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
         reversed ^= self.state().search_reverse;
 
-        let mut idx = self
-            .state()
-            .list_state
-            .selected()
-            .ok_or_else(|| Error::StateIndexError)?;
+        let mut idx = self.idx()?;
         let search_string = self.state().search_string.clone();
+        let is_case_sensitive = search_string.chars().any(|c| c.is_uppercase());
+        let regex = RegexBuilder::new(&search_string)
+            .case_insensitive(!is_case_sensitive)
+            .build()
+            .map_err(|_| Error::GlobalError("invalid regex".to_string()))?;
+
         loop {
             match reversed {
                 true => {
@@ -77,7 +87,8 @@ pub trait GitApp {
             let line = self
                 .get_text_line(idx)
                 .ok_or_else(|| Error::ReachedLastMachted)?;
-            if line.contains(&search_string) {
+            
+            if regex.is_match(line) {
                 self.state().list_state.select(Some(idx as usize));
                 return Ok(());
             }
@@ -323,15 +334,21 @@ pub trait GitApp {
             Action::Quit => self.state().quit = true,
             Action::HalfPageUp => self.state().list_state.scroll_up_by(height as u16 / 3),
             Action::HalfPageDown => self.state().list_state.scroll_down_by(height as u16 / 3),
-            Action::CenterVertically => {
-                let mut idx = self
-                    .state()
-                    .list_state
-                    .selected()
-                    .ok_or_else(|| Error::StateIndexError)?;
+            Action::ShiftLineMiddle => {
+                let idx = self.idx()?;
                 if idx > height / 2 {
-                    idx = idx - height / 2;
-                    *self.state().list_state.offset_mut() = idx;
+                    *self.state().list_state.offset_mut() = idx - height / 2;
+                } else {
+                    *self.state().list_state.offset_mut() = 0;
+                };
+            }
+            Action::ShiftLineTop => {
+                *self.state().list_state.offset_mut() = self.idx()?;
+            }
+            Action::ShiftLineBottom => {
+                let idx = self.idx()?;
+                if idx > height {
+                    *self.state().list_state.offset_mut() = idx - height;
                 } else {
                     *self.state().list_state.offset_mut() = 0;
                 };

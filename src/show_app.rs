@@ -160,11 +160,7 @@ impl GitApp for ShowApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        let idx = self
-            .state
-            .list_state
-            .selected()
-            .ok_or_else(|| Error::StateIndexError)?;
+        let idx = self.idx()?;
         let file = self
             .commit
             .files
