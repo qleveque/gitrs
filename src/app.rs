@@ -35,8 +35,10 @@ pub trait GitApp {
     fn get_text_line(&mut self, _idx: usize) -> Option<&str>;
 
     fn state(&mut self) -> &mut AppState;
-    fn idx(&mut self) -> Result<usize, Error> {
-        self.state()
+    fn get_state(&self) -> &AppState;
+
+    fn idx(&self) -> Result<usize, Error> {
+        self.get_state()
             .list_state
             .selected()
             .ok_or_else(|| Error::StateIndexError)
@@ -68,7 +70,10 @@ pub trait GitApp {
 
         let mut idx = self.idx()?;
         let search_string = self.state().search_string.clone();
-        let is_case_sensitive = search_string.chars().any(|c| c.is_uppercase());
+        let is_case_sensitive = match self.state().config.smart_case {
+            true => search_string.chars().any(|c| c.is_uppercase()),
+            false => true
+        };
         let regex = RegexBuilder::new(&search_string)
             .case_insensitive(!is_case_sensitive)
             .build()
@@ -424,6 +429,7 @@ pub trait GitApp {
         if let Some(rev) = revision {
             command = command.replace("%(rev)", &rev);
         }
+        command = command.replace("%(git)", &self.state().config.git_exe);
 
         let mut bash_proc = Command::new("bash");
         let proc = bash_proc.args(["-c", &command]);

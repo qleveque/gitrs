@@ -187,6 +187,10 @@ impl GitApp for BlameApp {
         &mut self.state
     }
 
+    fn get_state(&self) -> &AppState {
+        &self.state
+    }
+
     fn get_text_line(&mut self, idx: usize) -> Option<&str> {
         self.code.get(idx).map(|x| x.as_str())
     }

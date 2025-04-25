@@ -11,6 +11,7 @@ pub type KeyBindings = HashMap<String, Vec<(String, Action)>>;
 pub struct Config {
     pub scroll_off: usize,
     pub git_exe: String,
+    pub smart_case: bool,
     pub bindings: KeyBindings,
 }
 
@@ -51,7 +52,7 @@ impl Default for Config {
                 vec![
                     ("<cr>".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git difftool %(rev)^..%(rev) -- %(file)".to_string()
+                        "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string()
                     )),
                 ],
             ),
@@ -76,23 +77,23 @@ impl Default for Config {
                     ("J".to_string(), Action::FocusStagedView),
                     ("!c".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git commit".to_string(),
+                        "%(git) commit".to_string(),
                     )),
                     ("!a".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git commit --amend".to_string(),
+                        "%(git) commit --amend".to_string(),
                     )),
                     ("!n".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git commit --amend --no-edit".to_string(),
+                        "%(git) commit --amend --no-edit".to_string(),
                     )),
                     ("!p".to_string(), Action::Command(
                         CommandType::SyncQuit,
-                        "git push".to_string(),
+                        "%(git) push".to_string(),
                     )),
                     ("!P".to_string(), Action::Command(
                         CommandType::SyncQuit,
-                        "git push --force".to_string(),
+                        "%(git) push --force".to_string(),
                     )),
                 ],
             ),
@@ -101,7 +102,7 @@ impl Default for Config {
                 vec![
                     ("<cr>".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git difftool -- %(file)".to_string()
+                        "%(git) difftool -- %(file)".to_string()
                     )),
                 ],
             ),
@@ -110,7 +111,7 @@ impl Default for Config {
                 vec![
                     ("<cr>".to_string(), Action::Command(
                         CommandType::Sync,
-                        "git difftool --staged -- %(file)".to_string()
+                        "%(git) difftool --staged -- %(file)".to_string()
                     )),
                 ],
             ),
@@ -120,6 +121,7 @@ impl Default for Config {
         Config {
             scroll_off: 2,
             git_exe: "git".to_string(),
+            smart_case: true,
             bindings,
         }
     }
@@ -175,6 +177,7 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                             }
                         }
                         "git" => config.git_exe = value,
+                        "smart_case" => config.smart_case = value == "true",
                         variable => return Err(Error::ParseVariableError(variable.to_string())),
                     }
                 }

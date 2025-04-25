@@ -89,6 +89,14 @@ impl ShowApp {
 }
 
 impl GitApp for ShowApp {
+    fn state(&mut self) -> &mut AppState {
+        &mut self.state
+    }
+
+    fn get_state(&self) -> &AppState {
+        &self.state
+    }
+
     fn reload(&mut self) -> Result<(), Error> {
         let file_items: Vec<ListItem> = self
             .commit
@@ -115,10 +123,6 @@ impl GitApp for ShowApp {
         let metadata = Self::display_commit_metadata(self.commit.metadata.clone());
         self.view_model.commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));
         Ok(())
-    }
-
-    fn state(&mut self) -> &mut AppState {
-        &mut self.state
     }
 
     fn get_text_line(&mut self, idx: usize) -> Option<&str> {
