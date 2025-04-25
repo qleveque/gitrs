@@ -157,6 +157,19 @@ impl GitApp for ShowApp {
             &mut self.state.list_state,
         );
         self.view_model.files_height = chunks[1].height as usize;
+
+        let table: Vec<String> = self.commit.files.iter().map(|x| x.1.clone()).collect();
+        self.highlight_search(
+            frame,
+            &table,
+            Rect {
+                x: rect.x + chunks[1].x + 1,
+                y: chunks[1].y,
+                width: chunks[1].width - 1,
+                height: chunks[1].height,
+            }
+        );
+
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {

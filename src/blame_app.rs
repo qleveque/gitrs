@@ -286,6 +286,17 @@ impl GitApp for BlameApp {
             frame.buffer_mut(),
             &mut self.state.list_state,
         );
+
+        self.highlight_search(
+            frame,
+            &self.code,
+            Rect {
+                x: rect.x + chunks[1].x,
+                y: rect.y,
+                width: chunks[1].width,
+                height: chunks[1].height,
+            }
+        );
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {

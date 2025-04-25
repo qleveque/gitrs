@@ -229,7 +229,7 @@ impl GitApp for StatusApp {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(rect);
 
-        let left_list = list_to_draw(
+        let top_list = list_to_draw(
             &self.unstaged_table,
             chunks[0].width as usize,
             Color::Red,
@@ -237,7 +237,7 @@ impl GitApp for StatusApp {
             &self.state.config,
         );
         StatefulWidget::render(
-            &left_list,
+            &top_list,
             chunks[0],
             frame.buffer_mut(),
             match self.staged_status {
@@ -246,7 +246,7 @@ impl GitApp for StatusApp {
             },
         );
 
-        let right_list = list_to_draw(
+        let bottom_list = list_to_draw(
             &self.staged_table,
             chunks[1].width as usize,
             Color::Green,
@@ -254,13 +254,31 @@ impl GitApp for StatusApp {
             &self.state.config,
         );
         StatefulWidget::render(
-            &right_list,
+            &bottom_list,
             chunks[1],
             frame.buffer_mut(),
             match self.staged_status {
                 StagedStatus::Unstaged => &mut self.default_state,
                 StagedStatus::Staged => &mut self.state.list_state,
             },
+        );
+
+
+        let chunk = match self.staged_status {
+            StagedStatus::Unstaged => chunks[0],
+            StagedStatus::Staged => chunks[1],
+        };
+        // need to improve that
+        let table: Vec<String> = self.get_current_table().iter().map(|x| x.1.clone()).collect();
+        self.highlight_search(
+            frame,
+            &table,
+            Rect {
+                x: rect.x + chunk.x + 1,
+                y: chunk.y + 1,
+                width: chunk.width - 1,
+                height: chunk.height - 1,
+            }
         );
     }
 

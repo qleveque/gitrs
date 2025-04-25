@@ -56,29 +56,30 @@ enum Commands {
     },
 }
 
-fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), Error> {
-    let cli = Cli::parse();
-
-    enable_raw_mode()?;
-    terminal.clear()?;
+fn app(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    cli: Cli
+) -> Result<(), Error> {
     let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
     };
-    disable_raw_mode()?;
-    terminal.show_cursor()?;
     ret
 }
 
 fn main() -> io::Result<()> {
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
+    let cli = Cli::parse();
+    let backend = CrosstermBackend::new(stdout());
     let mut terminal = Terminal::new(backend)?;
 
-    let ret = app(&mut terminal);
+    execute!(stdout(), EnterAlternateScreen)?;
+    enable_raw_mode()?;
 
+    let ret = app(&mut terminal, cli);
+
+    disable_raw_mode()?;
+    terminal.show_cursor()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
 
     if let Err(err) = ret {

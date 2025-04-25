@@ -1,9 +1,8 @@
 use std::{
-    io::stdout,
-    process::{Command, Stdio},
+    cmp::min, io::stdout, process::{Command, Stdio}
 };
 
-use regex::RegexBuilder;
+use regex::{Regex, RegexBuilder};
 
 use crossterm::{
     event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -13,7 +12,7 @@ use crossterm::{
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::CrosstermBackend,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Text},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame, Terminal,
@@ -65,12 +64,9 @@ pub trait GitApp {
         self.notif(NotifType::Error, message);
     }
 
-    fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
-        reversed ^= self.state().search_reverse;
-
-        let mut idx = self.idx()?;
-        let search_string = self.state().search_string.clone();
-        let is_case_sensitive = match self.state().config.smart_case {
+    fn search_regex(&self) -> Result<Regex, Error> {
+        let search_string = self.get_state().search_string.clone();
+        let is_case_sensitive = match self.get_state().config.smart_case {
             true => search_string.chars().any(|c| c.is_uppercase()),
             false => true
         };
@@ -78,6 +74,13 @@ pub trait GitApp {
             .case_insensitive(!is_case_sensitive)
             .build()
             .map_err(|_| Error::GlobalError("invalid regex".to_string()))?;
+        Ok(regex)
+    }
+
+    fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
+        reversed ^= self.state().search_reverse;
+        let regex = self.search_regex()?;
+        let mut idx = self.idx()?;
 
         loop {
             match reversed {
@@ -122,6 +125,46 @@ pub trait GitApp {
         frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
         *chunk = chunks[0];
+    }
+
+    fn highlight_search(
+        &self,
+        frame: &mut Frame,
+        lines: &Vec<String>,
+        rect: Rect,
+    ) {
+        if self.get_state().search_string.is_empty() || rect.width == 0 {
+            return;
+        }
+        let first = self.get_state().list_state.offset();
+        let last = min(first + rect.height as usize, lines.len());
+        if let Ok(regex) = self.search_regex() {
+            for (idx, line) in lines[first..last].iter().enumerate() {
+                for mat in regex.find_iter(&line) {
+                    let match_start = (mat.start() + 1) as u16;
+                    let match_width = (mat.end() - mat.start()) as u16;
+                    if match_start >= rect.width {
+                        // result too far on the right
+                        continue;
+                    }
+                    let x = match_start;
+                    let x2 = min(x + match_width, rect.width);
+                    let width = x2 - x;
+
+                    let draw_rect = Rect {
+                        x: rect.x + x,
+                        y: rect.y + idx as u16,
+                        width,
+                        height: 1,
+                    };
+                    frame.render_widget(Clear, draw_rect);
+                    frame.render_widget(
+                        Paragraph::new(mat.as_str()).style(Style::from(Color::DarkGray).add_modifier(Modifier::REVERSED)),
+                        draw_rect,
+                    );
+                }
+            }
+        }
     }
 
     fn display_cmd_line(&mut self, chunk: &mut Rect, frame: &mut Frame) {
