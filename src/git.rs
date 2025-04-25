@@ -234,7 +234,7 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<Str
 pub fn git_log_output(config: &Config) -> Result<Lines<BufReader<ChildStdout>>, Error> {
     let args: Vec<String> = vec![
         "log".to_string(),
-        // "-p".to_string(),
+        "-p".to_string(),
     ];
 
     // Start the git log process

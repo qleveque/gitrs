@@ -3,7 +3,7 @@ use std::cmp::min;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget},
 };
 
@@ -55,8 +55,23 @@ impl ViewList {
 
         let list_items: Vec<ListItem> = items[first..last]
             .into_iter()
-            .map(|s| ListItem::new(s.to_string()))
-            .collect();
+            .map(|s| {
+                let (first_word, _) = s.split_once(' ').unwrap_or(("", ""));
+                let color = match first_word {
+                    "commit" => Color::Blue,
+                    "Author:" => Color::Green,
+                    "Date:" => Color::Yellow,
+                    "---" | "+++" | "@@" | "index" | "diff" => Color::DarkGray,
+                    first_word => {
+                        match first_word.chars().next() {
+                            Some('-') => Color::Red,
+                            Some('+') => Color::Green,
+                            _ => Color::White,
+                        }
+                    }
+                };
+                return ListItem::new(s.to_string()).style(Style::from(color));
+            }).collect();
         let inner = List::new(list_items)
             .block(Block::default().borders(Borders::NONE))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED));

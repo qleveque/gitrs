@@ -59,13 +59,18 @@ impl GitApp for LogApp {
 
     fn reload(&mut self) -> Result<(), Error> {
         if !self.loaded {
-            let chunk: Vec<_> = self.iterator.by_ref().take(100).collect::<Result<_, _>>()?;
+            let n = 100;
+            let chunk: Vec<_> = self.iterator.by_ref().take(n).collect::<Result<_, _>>()?;
             if chunk.is_empty() {
                 self.loaded = true;
             }
             self.lines.extend(chunk);
         }
-        self.view_model.list = ViewList::new(&self.lines, self.view_model.height, &mut self.state);
+        self.view_model.list = ViewList::new(
+            &self.lines,
+            self.view_model.height,
+            &mut self.state,
+        );
 
         Ok(())
     }
