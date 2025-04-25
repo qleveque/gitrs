@@ -13,7 +13,7 @@ use ratatui::{
     prelude::CrosstermBackend,
     style::{Color, Style},
     text::{Line, Text},
-    widgets::{Block, Borders, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame, Terminal,
 };
 
@@ -87,8 +87,8 @@ pub trait GitApp {
     fn display_search_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) {
         let search_string = if self.state().input_state == InputState::Search {
             match self.state().search_reverse {
-                false => format!("/{}|", self.state().search_string),
-                true => format!("?{}|", self.state().search_string),
+                false => format!("/{}│", self.state().search_string),
+                true => format!("?{}│", self.state().search_string),
             }
         } else {
             format!(" {}", self.state().search_string)
@@ -103,6 +103,7 @@ pub trait GitApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(2)])
             .split(*chunk);
+        frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
         *chunk = chunks[0];
     }
@@ -115,6 +116,7 @@ pub trait GitApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(2)])
             .split(*chunk);
+        frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
         *chunk = chunks[0];
     }
@@ -140,6 +142,7 @@ pub trait GitApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(len)])
             .split(*chunk);
+        frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
         *chunk = chunks[0];
     }
@@ -152,6 +155,8 @@ pub trait GitApp {
             terminal.draw(|mut frame| {
                 let mut chunk = frame.area();
 
+                self.draw(frame, chunk);
+
                 if self.state().input_state == InputState::Search
                     || !self.state().search_string.is_empty()
                 {
@@ -163,7 +168,6 @@ pub trait GitApp {
                 if !self.state().notif.is_empty() {
                     self.display_notifications(&mut chunk, &mut frame);
                 }
-                self.draw(frame, chunk);
             })?;
 
             let opt_action = match self.handle_user_input() {
