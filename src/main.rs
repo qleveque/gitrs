@@ -5,8 +5,10 @@ mod blame_app;
 mod config;
 mod errors;
 mod git;
+mod log_app;
 mod show_app;
 mod status_app;
+mod view_list;
 
 use std::io::{self, stdout};
 
@@ -14,6 +16,7 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
+use log_app::LogApp;
 use show_app::ShowApp;
 use status_app::StatusApp;
 
@@ -54,16 +57,17 @@ enum Commands {
         /// Optional revision hash or reference
         revision: Option<String>,
     },
+
+    /// Show git log
+    Log,
 }
 
-fn app(
-    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    cli: Cli
-) -> Result<(), Error> {
+fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {
     let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
+        Commands::Log => LogApp::new()?.run(terminal),
     };
     ret
 }

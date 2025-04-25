@@ -40,7 +40,7 @@ impl ShowApp {
         let original_dir = env::current_dir()?;
         set_git_dir(&state.config);
 
-        let output = git_show_output(&revision, &state.config);
+        let output = git_show_output(&revision, &state.config)?;
         let mut lines = output.lines().map(String::from);
         let (mut commit, _) = git_parse_commit(&mut lines);
         commit
@@ -163,13 +163,12 @@ impl GitApp for ShowApp {
             frame,
             &table,
             Rect {
-                x: rect.x + chunks[1].x + 1,
+                x: rect.x + chunks[1].x + 2,
                 y: chunks[1].y,
                 width: chunks[1].width - 1,
                 height: chunks[1].height,
-            }
+            },
         );
-
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {

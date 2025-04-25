@@ -263,22 +263,25 @@ impl GitApp for StatusApp {
             },
         );
 
-
         let chunk = match self.staged_status {
             StagedStatus::Unstaged => chunks[0],
             StagedStatus::Staged => chunks[1],
         };
         // need to improve that
-        let table: Vec<String> = self.get_current_table().iter().map(|x| x.1.clone()).collect();
+        let table: Vec<String> = self
+            .get_current_table()
+            .iter()
+            .map(|x| x.1.clone())
+            .collect();
         self.highlight_search(
             frame,
             &table,
             Rect {
-                x: rect.x + chunk.x + 1,
+                x: rect.x + chunk.x + 2,
                 y: chunk.y + 1,
                 width: chunk.width - 1,
                 height: chunk.height - 1,
-            }
+            },
         );
     }
 

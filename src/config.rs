@@ -4,7 +4,10 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-use crate::{action::{Action, CommandType}, errors::Error};
+use crate::{
+    action::{Action, CommandType},
+    errors::Error,
+};
 
 pub type KeyBindings = HashMap<String, Vec<(String, Action)>>;
 
@@ -49,12 +52,13 @@ impl Default for Config {
             ),
             (
                 "show".to_string(),
-                vec![
-                    ("<cr>".to_string(), Action::Command(
+                vec![(
+                    "<cr>".to_string(),
+                    Action::Command(
                         CommandType::Sync,
-                        "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string()
-                    )),
-                ],
+                        "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                    ),
+                )],
             ),
             (
                 "blame".to_string(),
@@ -75,45 +79,47 @@ impl Default for Config {
                     ("<tab>".to_string(), Action::SwitchView),
                     ("K".to_string(), Action::FocusUnstagedView),
                     ("J".to_string(), Action::FocusStagedView),
-                    ("!c".to_string(), Action::Command(
-                        CommandType::Sync,
-                        "%(git) commit".to_string(),
-                    )),
-                    ("!a".to_string(), Action::Command(
-                        CommandType::Sync,
-                        "%(git) commit --amend".to_string(),
-                    )),
-                    ("!n".to_string(), Action::Command(
-                        CommandType::Sync,
-                        "%(git) commit --amend --no-edit".to_string(),
-                    )),
-                    ("!p".to_string(), Action::Command(
-                        CommandType::SyncQuit,
-                        "%(git) push".to_string(),
-                    )),
-                    ("!P".to_string(), Action::Command(
-                        CommandType::SyncQuit,
-                        "%(git) push --force".to_string(),
-                    )),
+                    (
+                        "!c".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) commit".to_string()),
+                    ),
+                    (
+                        "!a".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) commit --amend".to_string()),
+                    ),
+                    (
+                        "!n".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) commit --amend --no-edit".to_string(),
+                        ),
+                    ),
+                    (
+                        "!p".to_string(),
+                        Action::Command(CommandType::SyncQuit, "%(git) push".to_string()),
+                    ),
+                    (
+                        "!P".to_string(),
+                        Action::Command(CommandType::SyncQuit, "%(git) push --force".to_string()),
+                    ),
                 ],
             ),
             (
                 "unstaged".to_string(),
-                vec![
-                    ("<cr>".to_string(), Action::Command(
-                        CommandType::Sync,
-                        "%(git) difftool -- %(file)".to_string()
-                    )),
-                ],
+                vec![(
+                    "<cr>".to_string(),
+                    Action::Command(CommandType::Sync, "%(git) difftool -- %(file)".to_string()),
+                )],
             ),
             (
                 "staged".to_string(),
-                vec![
-                    ("<cr>".to_string(), Action::Command(
+                vec![(
+                    "<cr>".to_string(),
+                    Action::Command(
                         CommandType::Sync,
-                        "%(git) difftool --staged -- %(file)".to_string()
-                    )),
-                ],
+                        "%(git) difftool --staged -- %(file)".to_string(),
+                    ),
+                )],
             ),
         ]
         .into_iter()

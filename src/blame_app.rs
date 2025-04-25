@@ -291,11 +291,11 @@ impl GitApp for BlameApp {
             frame,
             &self.code,
             Rect {
-                x: rect.x + chunks[1].x,
+                x: rect.x + chunks[1].x + 1,
                 y: rect.y,
                 width: chunks[1].width,
                 height: chunks[1].height,
-            }
+            },
         );
     }
 

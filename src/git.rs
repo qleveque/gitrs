@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
     env,
-    io::{BufRead, BufReader},
-    process::{exit, Command, Stdio},
+    io::{BufRead, BufReader, Lines},
+    process::{exit, ChildStdout, Command, Stdio},
 };
 
-use crate::config::Config;
+use crate::{config::Config, errors::Error};
 
 #[derive(Debug, Clone, Copy, PartialEq, Ord, PartialOrd)]
 #[repr(u8)]
@@ -215,7 +215,7 @@ where
     )
 }
 
-pub fn git_show_output(revision: &Option<String>, config: &Config) -> String {
+pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
     let mut args: Vec<String> = vec![
         "show".to_string(),
         "--decorate".to_string(),
@@ -226,12 +226,26 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> String {
     if let Some(rev) = revision {
         args.push(rev.clone());
     }
-    let output = Command::new(config.git_exe.clone())
-        .args(args)
-        .output()
-        .expect("Failed to execute git blame");
+    let output = Command::new(config.git_exe.clone()).args(args).output()?;
 
-    String::from_utf8_lossy(&output.stdout).to_string()
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+pub fn git_log_output(config: &Config) -> Result<Lines<BufReader<ChildStdout>>, Error> {
+    let args: Vec<String> = vec![
+        "log".to_string(),
+        // "-p".to_string(),
+    ];
+
+    // Start the git log process
+    let command = Command::new(config.git_exe.clone())
+        .args(args)
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    let stdout = command.stdout.ok_or_else(|| Error::GitParsingError)?;
+
+    Ok(BufReader::new(stdout).lines())
 }
 
 #[cfg(target_os = "linux")]

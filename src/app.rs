@@ -1,5 +1,7 @@
 use std::{
-    cmp::min, io::stdout, process::{Command, Stdio}
+    cmp::min,
+    io::stdout,
+    process::{Command, Stdio},
 };
 
 use regex::{Regex, RegexBuilder};
@@ -68,7 +70,7 @@ pub trait GitApp {
         let search_string = self.get_state().search_string.clone();
         let is_case_sensitive = match self.get_state().config.smart_case {
             true => search_string.chars().any(|c| c.is_uppercase()),
-            false => true
+            false => true,
         };
         let regex = RegexBuilder::new(&search_string)
             .case_insensitive(!is_case_sensitive)
@@ -95,7 +97,7 @@ pub trait GitApp {
             let line = self
                 .get_text_line(idx)
                 .ok_or_else(|| Error::ReachedLastMachted)?;
-            
+
             if regex.is_match(line) {
                 self.state().list_state.select(Some(idx as usize));
                 return Ok(());
@@ -104,13 +106,9 @@ pub trait GitApp {
     }
 
     fn display_search_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) {
-        let search_string = if self.state().input_state == InputState::Search {
-            match self.state().search_reverse {
-                false => format!("/{}│", self.state().search_string),
-                true => format!("?{}│", self.state().search_string),
-            }
-        } else {
-            format!(" {}", self.state().search_string)
+        let search_string = match self.state().search_reverse {
+            false => format!("/{}│", self.state().search_string),
+            true => format!("?{}│", self.state().search_string),
         };
         let title = match self.state().search_reverse {
             false => "Search",
@@ -127,12 +125,7 @@ pub trait GitApp {
         *chunk = chunks[0];
     }
 
-    fn highlight_search(
-        &self,
-        frame: &mut Frame,
-        lines: &Vec<String>,
-        rect: Rect,
-    ) {
+    fn highlight_search(&self, frame: &mut Frame, lines: &Vec<String>, rect: Rect) {
         if self.get_state().search_string.is_empty() || rect.width == 0 {
             return;
         }
@@ -141,7 +134,7 @@ pub trait GitApp {
         if let Ok(regex) = self.search_regex() {
             for (idx, line) in lines[first..last].iter().enumerate() {
                 for mat in regex.find_iter(&line) {
-                    let match_start = (mat.start() + 1) as u16;
+                    let match_start = mat.start() as u16;
                     let match_width = (mat.end() - mat.start()) as u16;
                     if match_start >= rect.width {
                         // result too far on the right
@@ -159,7 +152,11 @@ pub trait GitApp {
                     };
                     frame.render_widget(Clear, draw_rect);
                     frame.render_widget(
-                        Paragraph::new(mat.as_str()).style(Style::from(Color::DarkGray).add_modifier(Modifier::REVERSED)),
+                        Paragraph::new(mat.as_str()).style(
+                            Style::from(Color::DarkGray)
+                                .bg(Color::LightYellow)
+                                .add_modifier(Modifier::REVERSED),
+                        ),
                         draw_rect,
                     );
                 }
@@ -216,9 +213,7 @@ pub trait GitApp {
 
                 self.draw(frame, chunk);
 
-                if self.state().input_state == InputState::Search
-                    || !self.state().search_string.is_empty()
-                {
+                if self.state().input_state == InputState::Search {
                     self.display_search_bar(&mut chunk, &mut frame);
                 }
                 if self.state().input_state == InputState::Command {
