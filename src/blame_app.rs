@@ -1,7 +1,7 @@
 use crate::action::Action;
 use crate::app::GitApp;
 use crate::app_state::AppState;
-use crate::config::Config;
+use crate::config::{Config, MappingScope};
 
 use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
@@ -297,8 +297,8 @@ impl GitApp for BlameApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
-        vec![("blame", true)]
+    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
+        vec![(MappingScope::Blame, true)]
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {

@@ -2,6 +2,7 @@ use crate::action::Action;
 use crate::app::GitApp;
 use crate::app_state::AppState;
 
+use crate::config::MappingScope;
 use crate::errors::Error;
 use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
 
@@ -169,8 +170,8 @@ impl GitApp for ShowApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
-        vec![("show", true)]
+    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
+        vec![(MappingScope::Show, true)]
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {

@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader}, str::FromStr,
 };
 
 use crate::{
@@ -9,7 +9,39 @@ use crate::{
     errors::Error,
 };
 
-pub type KeyBindings = HashMap<String, Vec<(String, Action)>>;
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub enum MappingScope {
+    Global,
+    Show,
+    Status,
+    StatusUnstaged,
+    StatusStaged,
+    StatusUnmerged,
+    StatusUntracked,
+    Log,
+    Blame,
+}
+
+impl FromStr for MappingScope {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "global" => Ok(MappingScope::Global),
+            "show" => Ok(MappingScope::Show),
+            "status" => Ok(MappingScope::Status),
+            "unstaged" => Ok(MappingScope::StatusUnstaged),
+            "staged" => Ok(MappingScope::StatusStaged),
+            "unmerged" => Ok(MappingScope::StatusUnmerged),
+            "untracked" => Ok(MappingScope::StatusUntracked),
+            "log" => Ok(MappingScope::Log),
+            "blame" => Ok(MappingScope::Blame),
+            _ => return Err(Error::ParseMappingScopeError(s.to_string())),
+        }
+    }
+}
+
+pub type KeyBindings = HashMap<MappingScope, Vec<(String, Action)>>;
 
 pub struct Config {
     pub scroll_off: usize,
@@ -22,7 +54,7 @@ impl Default for Config {
     fn default() -> Self {
         let bindings: KeyBindings = [
             (
-                "global".to_string(),
+                MappingScope::Global,
                 vec![
                     ("k".to_string(), Action::Up),
                     ("<up>".to_string(), Action::Up),
@@ -51,7 +83,7 @@ impl Default for Config {
                 ],
             ),
             (
-                "show".to_string(),
+                MappingScope::Show,
                 vec![(
                     "<cr>".to_string(),
                     Action::Command(
@@ -61,7 +93,7 @@ impl Default for Config {
                 )],
             ),
             (
-                "blame".to_string(),
+                MappingScope::Blame,
                 vec![
                     ("l".to_string(), Action::NextCommitBlame),
                     ("<right>".to_string(), Action::NextCommitBlame),
@@ -71,7 +103,15 @@ impl Default for Config {
                 ],
             ),
             (
-                "status".to_string(),
+                MappingScope::Log,
+                vec![
+                    ("<cr>".to_string(), Action::ShowCommit),
+                    ("c".to_string(), Action::NextCommit),
+                    ("C".to_string(), Action::PreviousCommit),
+                ],
+            ),
+            (
+                MappingScope::Status,
                 vec![
                     ("t".to_string(), Action::StageUnstageFile),
                     ("<space>".to_string(), Action::StageUnstageFile),
@@ -105,14 +145,14 @@ impl Default for Config {
                 ],
             ),
             (
-                "unstaged".to_string(),
+                MappingScope::StatusUnstaged,
                 vec![(
                     "<cr>".to_string(),
                     Action::Command(CommandType::Sync, "%(git) difftool -- %(file)".to_string()),
                 )],
             ),
             (
-                "staged".to_string(),
+                MappingScope::StatusStaged,
                 vec![(
                     "<cr>".to_string(),
                     Action::Command(
@@ -120,14 +160,6 @@ impl Default for Config {
                         "%(git) difftool --staged -- %(file)".to_string(),
                     ),
                 )],
-            ),
-            (
-                "log".to_string(),
-                vec![
-                    ("<cr>".to_string(), Action::ShowCommit),
-                    ("c".to_string(), Action::NextCommit),
-                    ("C".to_string(), Action::PreviousCommit),
-                ],
             ),
         ]
         .into_iter()
@@ -172,7 +204,7 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                     let action = action_str.parse::<Action>()?;
                     config
                         .bindings
-                        .entry(mode)
+                        .entry(mode.parse()?)
                         .or_insert_with(Vec::new)
                         .push((key, action));
                 }
@@ -191,7 +223,7 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                             }
                         }
                         "git" => config.git_exe = value,
-                        "smart_case" => config.smart_case = value == "true",
+                        "smartcase" => config.smart_case = value == "true",
                         variable => return Err(Error::ParseVariableError(variable.to_string())),
                     }
                 }

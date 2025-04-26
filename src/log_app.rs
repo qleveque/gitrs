@@ -5,6 +5,7 @@ use crate::action::Action;
 use crate::app::GitApp;
 use crate::app_state::AppState;
 
+use crate::config::MappingScope;
 use crate::errors::Error;
 use crate::git::git_log_output;
 use crate::view_list::ViewList;
@@ -185,8 +186,8 @@ impl GitApp for LogApp {
         self.highlight_search(frame, rect);
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
-        vec![("log", true)]
+    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
+        vec![(MappingScope::Log, true)]
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {

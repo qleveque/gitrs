@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("unknown action `{0}`")]
     ParseActionError(String),
+    #[error("unknown mapping scope `{0}`")]
+    ParseMappingScopeError(String),
     #[error("error parsing utf-8")]
     ParseUtf8Error(#[from] FromUtf8Error),
     #[error("unable to set variable `{0}`")]

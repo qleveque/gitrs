@@ -4,6 +4,8 @@ use std::{
     process::{Command, Stdio},
 };
 
+
+use crate::config::MappingScope;
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
@@ -21,10 +23,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::{Action, CommandType},
-    app_state::{AppState, InputState, Notif, NotifType},
-    errors::Error,
-    show_app::ShowApp,
+    action::{Action, CommandType}, app_state::{AppState, InputState, Notif, NotifType}, errors::Error, show_app::ShowApp
 };
 
 pub trait GitApp {
@@ -45,7 +44,7 @@ pub trait GitApp {
             .selected()
             .ok_or_else(|| Error::StateIndexError)
     }
-    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)>;
+    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)>;
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error>;
 
     fn run_action(
@@ -340,11 +339,14 @@ pub trait GitApp {
         let bindings = self.state().config.bindings.clone();
 
         let mut potential = false;
-        for field in [self.get_mapping_fields().as_slice(), &[("global", true)]].concat() {
+        for field in [
+            self.get_mapping_fields().as_slice(),
+            &[(MappingScope::Global, true)]
+        ].concat() {
             if !field.1 {
                 continue;
             }
-            if let Some(mode_hotkeys) = bindings.get(field.0) {
+            if let Some(mode_hotkeys) = bindings.get(&field.0) {
                 for (key_combination, action) in mode_hotkeys {
                     if *action == Action::None {
                         continue;

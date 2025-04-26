@@ -2,7 +2,8 @@ use crate::action::Action;
 use crate::app::GitApp;
 use crate::app_state::AppState;
 use crate::errors::Error;
-use crate::{config::Config, git::FileStatus};
+use crate::config::{Config, MappingScope};
+use crate::git::FileStatus;
 
 use std::collections::HashMap;
 
@@ -278,25 +279,25 @@ impl GitApp for StatusApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
         let git_file = match self.get_mut_git_file() {
             Ok(git_file) => git_file,
-            Err(_) => return vec![("status", true)],
+            Err(_) => return vec![(MappingScope::Status, true)],
         };
         vec![
             (
-                "unmerged",
+                MappingScope::StatusUnmerged,
                 self.staged_status == StagedStatus::Unstaged
                     && git_file.unstaged_status == FileStatus::Unmerged,
             ),
             (
-                "untracked",
+                MappingScope::StatusUntracked,
                 self.staged_status == StagedStatus::Unstaged
                     && git_file.unstaged_status == FileStatus::New,
             ),
-            ("staged", self.staged_status == StagedStatus::Staged),
-            ("unstaged", self.staged_status == StagedStatus::Unstaged),
-            ("status", true),
+            (MappingScope::StatusStaged, self.staged_status == StagedStatus::Staged),
+            (MappingScope::StatusUnstaged, self.staged_status == StagedStatus::Unstaged),
+            (MappingScope::Status, true),
         ]
     }
 
