@@ -1,93 +1,173 @@
 # gitrs
 
-A git TUI written in Rust with ratatui.
+> A fast, intuitive Git TUI written in Rust with [ratatui](https://github.com/ratatui-org/ratatui), heavily inspired by [tig](https://github.com/jonas/tig).
 
 ![demo](https://github.com/qleveque/gitrs/blob/main/resources/demo.gif?raw=true)
 
-This is still a work in progress.
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Usage](#usage)
+- [Default Key Bindings](#default-key-bindings)
+- [Actions](#actions)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Features
+
+- Status, Log, Show, and Blame views
+- Highly customizable key mappings
+- Built-in and shell action support
+- Asynchronous command execution
+- Minimal, fast, and intuitive interface
+
+---
 
 ## Usage
 
-+ <kbd>k</kbd>/<kbd>↑</kbd> Go up
-+ <kbd>j</kbd>/<kbd>↓</kbd> Go down
-+ <kbd>g</kbd>/<kbd>Home</kbd> Go to first
-+ <kbd>G</kbd>/<kbd>End</kbd> Go to last
-+ <kbd>q</kbd>/<kbd>Backspace</kbd> Go back
-+ <kbd>Ctrl+u</kbd> Go up half a page
-+ <kbd>Ctrl+d</kbd> Go down half a page
-
-## Commands
-
-### `$ gitrs status`
-
-List new/modified/deleted files from the working tree and the staging area.
-
-+ <kbd>t</kbd>/<kbd>Space</kbd> Stage/unstage selected file
-+ <kbd>T</kbd>/<kbd>Enter</kbd> Stage/unstage all the files
-+ <kbd>Tab</kbd> Switch between untracked and staged column
-+ <kbd>J</kbd> Select staged column
-+ <kbd>K</kbd> Select untracked column
-+ <kbd>r</kbd> Reload the view
-
-### `$ gitrs show [revision]`
-
-Show commit details: hash, references, author, date, commit title and message.
-Display the list of modified files.
-
-### `$ gitrs blame <file> [line]`
-
-Show the blame of the given file.
-+ <kbd>Enter</kbd>/<kbd>Space</kbd> Show commit defails
-+ <kbd>h</kbd>/<kbd>←</kbd> Go to parent blame
-+ <kbd>l</kbd>/<kbd>→</kbd> Go back to previous blame
-
-## Configure
-
-You can configure the behaviour of gitrs through the `~/.gitrsrc` file.
-
-You can create command shorcuts as follow:
-```
-map <scope> <hotkey> [>!@]<command>
-```
-`scope` can be either of `global`, `blame`, `show`, `status`, `staged`, `unstaged`, `unmerged`, `untracked`.
-
-+ `!`: run and wait for the command to execute
-+ `>`: like `!` but it exits gitrs after the command execution
-+ `@`: run the command asynchronously in the background
-
-You can also configure other parameters as follow:
-```
-set {key} {value}
+```bash
+gitrs status
+gitrs log [...params]
+gitrs show [revision]
+gitrs blame <file> [line]
 ```
 
-+ `git`: set the git executable (useful if on WSL and you want to use `git.exe`)
-+ `scrolloff`: configure the scroll off
+Each view reimagines a common Git workflow to make it faster, simpler, and more user-friendly than traditional Git commands.
 
-## Configuration example (`~/.gitrsrc`)
+---
 
+## Default Key Bindings
+
+<details>
+<summary><strong>Global</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>k</kbd> / <kbd>↑</kbd> | Go up |
+| <kbd>j</kbd> / <kbd>↓</kbd> | Go down |
+| <kbd>g</kbd><kbd>g</kbd> / <kbd>Home</kbd> | Go to first item |
+| <kbd>G</kbd> / <kbd>End</kbd> | Go to last item |
+| <kbd>Ctrl+u</kbd> / <kbd>PageUp</kbd> | Half-page up |
+| <kbd>Ctrl+d</kbd> / <kbd>PageDown</kbd> | Half-page down |
+| <kbd>r</kbd> | Reload |
+| <kbd>q</kbd> / <kbd>Esc</kbd> | Quit |
+| <kbd>/</kbd> / <kbd>Ctrl+f</kbd> | Search forward |
+| <kbd>?</kbd> | Search backward |
+| <kbd>n</kbd> | Next search result |
+| <kbd>N</kbd> | Previous search result |
+| <kbd>z</kbd><kbd>z</kbd> | Center current line |
+| <kbd>z</kbd><kbd>t</kbd> | Move current line to top |
+| <kbd>z</kbd><kbd>b</kbd> | Move current line to bottom |
+| <kbd>:</kbd> | Type and run an [action](#actions) |
+
+</details>
+<details>
+<summary><strong>Status</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Open `git difftool` |
+| <kbd>t</kbd> / <kbd>Space</kbd> | Stage/unstage selected file |
+| <kbd>T</kbd> | Stage/unstage all files |
+| <kbd>Tab</kbd> | Switch between columns |
+| <kbd>J</kbd> | Focus staged files |
+| <kbd>K</kbd> | Focus unstaged/untracked files |
+| <kbd>!</kbd><kbd>c</kbd> | `git commit` |
+| <kbd>!</kbd><kbd>a</kbd> | `git commit --amend` |
+| <kbd>!</kbd><kbd>n</kbd> | `git commit --amend --no-edit` |
+| <kbd>!</kbd><kbd>p</kbd> | `git push` |
+| <kbd>!</kbd><kbd>P</kbd> | `git push --force` |
+
+</details>
+<details>
+<summary><strong>Log</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Show commit details |
+| <kbd>c</kbd> | Next commit |
+| <kbd>C</kbd> | Previous commit |
+
+</details>
+<details>
+<summary><strong>Show</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Open `git difftool` |
+
+</details>
+<details>
+<summary><strong>Blame</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Show commit details |
+| <kbd>h</kbd> / <kbd>←</kbd> | Go to parent blame |
+| <kbd>l</kbd> / <kbd>→</kbd> | Return to previous blame |
+
+</details>
+
+---
+
+## Actions
+
+An action can be a:
+
+- **Shell command**:
+    * `!` Run and wait
+    * `>` Run, then exit
+    * `@` Run asynchronously
+    * Placeholders:
+        * `%(rev)` will be replaced by the current commit hash
+        * `%(file)` will be replaced by the current file path
+- **Builtin command**:
+    - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
+    - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
+    - Status specific: `stage_unstage_file`, `stage_unstage_files`, `show_commit`
+    - Blame specific: `next_commit_blame`, `previous_commit_blame`
+    - Log specific: `next_commit`, `previous_commit`
+    - Others: `nop`, `reload`, `quit`
+
+---
+
+## Configuration
+
+Configure gitrs by creating a `~/.gitrsrc` file.
+
+#### Mapping Hotkeys
+
+```bash
+map <scope> <hotkey> <action>
 ```
-map global d !git difftool '%(rev)^..%(rev)' '%(file)'
-map staged d !git difftool --staged '%(file)'
-map status C >git commit
-map status A >git commit --amend
-map status N >git commit --amend --no-edit
-map untracked D !rm "%(file)"
-map unstaged ! !git restore "%(file)"
-map global yf @echo -n %(file) | xsel --input --clipboard
-map global yc @echo -n %(rev) | xsel --input --clipboard
+* scope: `global` | `show` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `log` | `blame`
+* hotkey: a vim-like key binding (e.g. `<c-x>E`)
+
+#### Setting Options
+
+```bash
+set {option} {value}
 ```
+| Option | Description | Default | Type |
+|:---|:---|:---|:---|
+| `git` | Path to Git executable (useful for WSL: `git.exe`) | `"git"` | string |
+| `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
+| `smartcase` | Use smart case or not | `"true"` | "false" \| "true"` |
 
-## TODO
+---
 
-- [ ] Improve the code quality
-- [ ] Searchbar to search for a specific content
-- [ ] Add the `log` command
-- [ ] Add the `stash` command
-- [ ] Add the `reflog` command
-- [ ] Add the `branch` command
-- [x] Allow multiple keystrokes in a command hotkey
-- [ ] Allow the use of modifiers (ctrl/shift) in a command hotkey
-- [ ] Handle renames
+## Contributing
 
-## Credits
-This tool was inspired by [tig](https://github.com/jonas/tig).
+Contributions are welcome!  
+Feel free to open issues, suggest improvements, or submit pull requests.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
