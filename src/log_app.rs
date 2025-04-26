@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -33,6 +34,7 @@ pub struct LogApp {
     state: AppState,
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
+    loaded: Arc<AtomicBool>,
     view_model: LogAppViewModel,
 }
 
@@ -70,7 +72,11 @@ impl LogApp {
         println!("{:?}", log_style);
 
         let lines = Arc::new(Mutex::new(vec![first_line_ansi]));
-        let list_data_clone = Arc::clone(&lines);
+        let lines_clone = Arc::clone(&lines);
+
+        let loaded = Arc::new(AtomicBool::new(false));
+        let loaded_clone = Arc::clone(&loaded);
+
         thread::spawn(move || {
             let n = 100;
             loop {
@@ -84,10 +90,13 @@ impl LogApp {
                                 Err(_) => "\x1b[31m/!\\ *** ERROR *** /!\\: gitrs could not read that line\x1b[0m".to_string(),
                             })
                         }
-                        None => break,
+                        None => {
+                            loaded_clone.store(true, Ordering::SeqCst);
+                            return;
+                        },
                     }
                 }
-                list_data_clone.lock().unwrap().extend(chunk);
+                lines_clone.lock().unwrap().extend(chunk);
             }
         });
 
@@ -95,6 +104,7 @@ impl LogApp {
             state,
             lines,
             log_style,
+            loaded,
             view_model: LogAppViewModel {
                 list: ViewList::default(),
                 height: 0,
@@ -165,6 +175,10 @@ impl GitApp for LogApp {
 
     fn reload(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn loaded(&self) -> bool {
+        self.loaded.load(Ordering::SeqCst)
     }
 
     fn get_text_line(&self, idx: usize) -> Option<String> {

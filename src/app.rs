@@ -34,6 +34,9 @@ pub trait GitApp {
     fn on_exit(&mut self) -> Result<(), Error> {
         Ok(())
     }
+    fn loaded(&self) -> bool {
+        true
+    }
     fn reload(&mut self) -> Result<(), Error>;
     fn get_text_line(&self, _idx: usize) -> Option<String>;
 
@@ -81,6 +84,32 @@ pub trait GitApp {
         Ok(regex)
     }
 
+    fn continue_search(&mut self, mut idx: usize) -> Result<(), Error>{
+        let regex = self.search_regex()?;
+        loop {
+            let line = match self.get_text_line(idx) {
+                None => {
+                    if !self.loaded() {
+                        // if not fully loaded yet, we need to continue the search
+                        self.state().current_search_idx = Some(idx);
+                        return Ok(());
+                    } else {
+                        self.state().current_search_idx = None;
+                        return Err(Error::ReachedLastMachted);
+                    }
+                },
+                Some(line) => line,
+            };
+
+            if regex.is_match(&line) {
+                self.state().list_state.select(Some(idx as usize));
+                self.state().current_search_idx = None;
+                return Ok(());
+            }
+            idx += 1;
+        }
+    }
+
     fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
         reversed ^= self.state().search_reverse;
         let regex = self.search_regex()?;
@@ -96,9 +125,20 @@ pub trait GitApp {
                 }
                 false => idx += 1,
             }
-            let line = self
-                .get_text_line(idx)
-                .ok_or_else(|| Error::ReachedLastMachted)?;
+            let line = match self.get_text_line(idx) {
+                None => {
+                    if !self.loaded() {
+                        assert_eq!(reversed, false);
+                        // if not fully loaded yet, we need to continue the search
+                        self.info("searching...");
+                        self.state().current_search_idx = Some(idx);
+                        return Ok(());
+                    } else {
+                        return Err(Error::ReachedLastMachted);
+                    }
+                },
+                Some(line) => line,
+            };
 
             if regex.is_match(&line) {
                 self.state().list_state.select(Some(idx as usize));
@@ -228,6 +268,10 @@ pub trait GitApp {
                 }
             })?;
 
+            if let Some(search_idx) = self.state().current_search_idx {
+                self.continue_search(search_idx)?;
+                continue;
+            }
             let opt_action = match self.handle_user_input() {
                 Err(err) => {
                     self.error(&err.to_string());
