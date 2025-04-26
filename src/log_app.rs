@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{env, thread};
 
 use crate::action::Action;
 use crate::app::GitApp;
@@ -8,7 +8,7 @@ use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::git_log_output;
+use crate::git::{git_log_output, set_git_dir};
 use crate::view_list::ViewList;
 
 use ratatui::layout::Rect;
@@ -35,12 +35,15 @@ pub struct LogApp {
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
     loaded: Arc<AtomicBool>,
+    original_dir: std::path::PathBuf,
     view_model: LogAppViewModel,
 }
 
 impl LogApp {
     pub fn new(args: Vec<String>) -> Result<Self, Error> {
         let state = AppState::new()?;
+        let original_dir = env::current_dir()?;
+        set_git_dir(&state.config);
         let git_exe = state.config.git_exe.clone();
         let mut iterator = git_log_output(git_exe, args).unwrap();
         let first_line_ansi = iterator
@@ -105,6 +108,7 @@ impl LogApp {
             lines,
             log_style,
             loaded,
+            original_dir,
             view_model: LogAppViewModel {
                 list: ViewList::default(),
                 height: 0,
@@ -309,5 +313,11 @@ impl GitApp for LogApp {
             }
         }
         return Ok(());
+    }
+
+    fn on_exit(&mut self) -> Result<(), Error> {
+        env::set_current_dir(self.original_dir.clone()).map_err(|_| {
+            Error::GlobalError("could not restore initial working directory".to_string())
+        })
     }
 }

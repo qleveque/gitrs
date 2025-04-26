@@ -32,7 +32,7 @@ use crossterm::{
 };
 
 #[derive(Parser)]
-#[command(name = "gitrs", version, about = "A TUI for git status, blame, show", long_about = None)]
+#[command(name = "gitrs", version, about = "A fast, intuitive Git TUI written in Rust", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -40,10 +40,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Show git status
+    /// Status view
     Status,
 
-    /// Show git blame
+    /// Blame view
     Blame {
         /// File to blame
         file: String,
@@ -53,14 +53,17 @@ enum Commands {
         line: usize,
     },
 
-    /// Show a git revision (commit, tag, etc)
+    /// Show view
     Show {
         /// Optional revision hash or reference
         revision: Option<String>,
     },
-    /// Show git log
+    /// Log view
     #[command(allow_hyphen_values = true)]
-    Log { args: Vec<String> },
+    Log {
+        /// Arguments passed to git log
+        args: Vec<String>
+    },
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {

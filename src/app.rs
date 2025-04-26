@@ -412,9 +412,6 @@ pub trait GitApp {
             }
             if let Some(mode_hotkeys) = bindings.get(&field.0) {
                 for (key_combination, action) in mode_hotkeys {
-                    if *action == Action::None {
-                        continue;
-                    }
                     if *key_combination == keys {
                         self.state().key_combination.clear();
                         return Ok(Some(action.clone()));

@@ -251,16 +251,17 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                     if parts.len() < 4 {
                         continue;
                     }
-                    let mode = parts[1].to_string();
+                    let mode = parts[1].to_string().parse()?;
                     let key = parts[2].to_string();
                     let action_str = parts[3].to_string();
 
                     let action = action_str.parse::<Action>()?;
-                    config
-                        .bindings
-                        .entry(mode.parse()?)
-                        .or_insert_with(Vec::new)
-                        .push((key, action));
+                    let bindings = config.bindings.entry(mode).or_insert_with(Vec::new);
+                    // remove keybindings with the same binding
+                    bindings.retain(|(k, _)| *k != key);
+                    if action != Action::None {
+                        bindings.push((key, action));
+                    }
                 }
                 "set" => {
                     let parts: Vec<&str> = line.splitn(3, ' ').collect();
