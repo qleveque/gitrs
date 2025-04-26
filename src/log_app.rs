@@ -12,6 +12,7 @@ use crate::view_list::ViewList;
 
 use ratatui::layout::Rect;
 
+use ratatui::widgets::Clear;
 use ratatui::Frame;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -43,7 +44,8 @@ impl LogApp {
         let first_line_ansi = iterator
             .by_ref()
             .next()
-            .ok_or_else(|| Error::GitParsingError)??;
+            .ok_or_else(|| Error::GitParsingError)??
+            .replace("\t", "    ");
 
         let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
         let first_line = String::from_utf8(bytes)?;
@@ -78,7 +80,7 @@ impl LogApp {
                     match next {
                         Some(res_line) => {
                             chunk.push(match res_line {
-                                Ok(line) => line,
+                                Ok(line) => line.replace("\t", "    "),
                                 Err(_) => "\x1b[31m/!\\ *** ERROR *** /!\\: gitrs could not read that line\x1b[0m".to_string(),
                             })
                         }
@@ -139,7 +141,7 @@ impl LogApp {
                         return Some(commit.to_string());
                     }
                 }
-            },
+            }
             LogStyle::OneLineGraph | LogStyle::OneLine => {
                 // assume this is the first word
                 let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
@@ -150,7 +152,6 @@ impl LogApp {
         }
         return None;
     }
-
 }
 
 impl GitApp for LogApp {
@@ -182,6 +183,7 @@ impl GitApp for LogApp {
             &mut self.state,
         );
         self.view_model.height = rect.height as usize;
+        frame.render_widget(Clear, rect);
         self.view_model.list.render(rect, frame.buffer_mut());
         self.highlight_search(frame, rect);
     }
@@ -193,7 +195,9 @@ impl GitApp for LogApp {
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
         let mut idx = self.idx()?;
         loop {
-            let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
+            let line = self
+                .get_stripped_line(idx)
+                .map_err(|_| Error::ReachedLastMachted)?;
             if let Some(commit) = self.read_log_line_rev(line) {
                 return Ok((None, Some(commit)));
             }
@@ -215,7 +219,9 @@ impl GitApp for LogApp {
             Action::NextCommit => {
                 let mut idx = self.idx()? + 1;
                 loop {
-                    let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
+                    let line = self
+                        .get_stripped_line(idx)
+                        .map_err(|_| Error::ReachedLastMachted)?;
                     if let Some(_) = self.read_log_line_rev(line) {
                         self.state.list_state.select(Some(idx));
                         break;
@@ -230,7 +236,9 @@ impl GitApp for LogApp {
                         break;
                     }
                     idx -= 1;
-                    let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
+                    let line = self
+                        .get_stripped_line(idx)
+                        .map_err(|_| Error::ReachedLastMachted)?;
                     if let Some(_) = self.read_log_line_rev(line) {
                         self.state.list_state.select(Some(idx));
                         break;

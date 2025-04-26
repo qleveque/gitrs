@@ -4,7 +4,6 @@ use std::{
     process::{Command, Stdio},
 };
 
-
 use crate::config::MappingScope;
 use regex::{Regex, RegexBuilder};
 
@@ -23,7 +22,10 @@ use ratatui::{
 };
 
 use crate::{
-    action::{Action, CommandType}, app_state::{AppState, InputState, Notif, NotifType}, errors::Error, show_app::ShowApp
+    action::{Action, CommandType},
+    app_state::{AppState, InputState, Notif, NotifType},
+    errors::Error,
+    show_app::ShowApp,
 };
 
 pub trait GitApp {
@@ -341,8 +343,10 @@ pub trait GitApp {
         let mut potential = false;
         for field in [
             self.get_mapping_fields().as_slice(),
-            &[(MappingScope::Global, true)]
-        ].concat() {
+            &[(MappingScope::Global, true)],
+        ]
+        .concat()
+        {
             if !field.1 {
                 continue;
             }

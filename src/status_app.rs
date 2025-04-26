@@ -1,8 +1,8 @@
 use crate::action::Action;
 use crate::app::GitApp;
 use crate::app_state::AppState;
-use crate::errors::Error;
 use crate::config::{Config, MappingScope};
+use crate::errors::Error;
 use crate::git::FileStatus;
 
 use std::collections::HashMap;
@@ -295,8 +295,14 @@ impl GitApp for StatusApp {
                 self.staged_status == StagedStatus::Unstaged
                     && git_file.unstaged_status == FileStatus::New,
             ),
-            (MappingScope::StatusStaged, self.staged_status == StagedStatus::Staged),
-            (MappingScope::StatusUnstaged, self.staged_status == StagedStatus::Unstaged),
+            (
+                MappingScope::StatusStaged,
+                self.staged_status == StagedStatus::Staged,
+            ),
+            (
+                MappingScope::StatusUnstaged,
+                self.staged_status == StagedStatus::Unstaged,
+            ),
             (MappingScope::Status, true),
         ]
     }

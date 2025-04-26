@@ -144,7 +144,9 @@ pub fn git_blame_output(file: String, revision: Option<String>, config: &Config)
         .output()
         .expect("Failed to execute git blame");
 
-    String::from_utf8_lossy(&output.stdout).to_string()
+    String::from_utf8_lossy(&output.stdout)
+        .to_string()
+        .replace("\t", "    ")
 }
 
 // TODO: simplify this method

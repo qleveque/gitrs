@@ -1,7 +1,8 @@
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader}, str::FromStr,
+    io::{BufRead, BufReader},
+    str::FromStr,
 };
 
 use crate::{
