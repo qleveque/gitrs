@@ -90,6 +90,7 @@ impl LogApp {
                             })
                         }
                         None => {
+                            lines_clone.lock().unwrap().extend(chunk);
                             loaded_clone.store(true, Ordering::SeqCst);
                             return;
                         },
