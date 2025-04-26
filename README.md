@@ -63,6 +63,9 @@ gitrs blame <file> [line]
 | <kbd>z</kbd><kbd>z</kbd> | Center current line |
 | <kbd>z</kbd><kbd>t</kbd> | Move current line to top |
 | <kbd>z</kbd><kbd>b</kbd> | Move current line to bottom |
+| <kbd>y</kbd><kbd>c</kbd> | Copy current commit hash to clipboard |
+| <kbd>y</kbd><kbd>f</kbd> | Copy current filename to clipboard |
+| <kbd>y</kbd><kbd>y</kbd> | Copy current text line to clipboard |
 | <kbd>:</kbd> | Type and run an [action](#actions) |
 
 </details>
@@ -129,6 +132,7 @@ An action can be a:
         * `%(rev)` will be replaced by the current commit hash
         * `%(file)` will be replaced by the current file path
         * `%(line)` will be replaced by the current context line
+        * `%(text)` will be replaced by the current line text
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
@@ -159,6 +163,7 @@ set <option> <value>
 | Option | Description | Default | Type |
 |:---|:---|:---|:---|
 | `git` | Path to Git executable (useful for WSL: `git.exe`) | `"git"` | string |
+| `clipboard` | Clipboard utility to use | `"clip.exe"` on Windows and `"xsel"` on Linux | string |
 | `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
 | `smartcase` | Use smart case or not | `"true"` | `"false" \| "true"` |
 

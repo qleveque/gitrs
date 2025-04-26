@@ -545,7 +545,7 @@ pub trait GitApp {
         mut command: String,
         file: Option<String>,
         rev: Option<String>,
-        line: Option<usize>,
+        line_number: Option<usize>,
     ) -> Result<(), Error> {
         if let Some(file) = file {
             command = command.replace("%(file)", &file);
@@ -553,9 +553,15 @@ pub trait GitApp {
         if let Some(rev) = rev {
             command = command.replace("%(rev)", &rev);
         }
-        if let Some(line) = line {
-            command = command.replace("%(line)", &format!("{}", line));
+        if let Some(line_number) = line_number {
+            command = command.replace("%(line)", &format!("{}", line_number));
         }
+        if let Ok(idx) = self.idx() {
+            if let Some(line) = self.get_text_line(idx) {
+                command = command.replace("%(text)", &line);
+            }
+        }
+        command = command.replace("%(clip)", &self.state().config.clipboard_tool);
         command = command.replace("%(git)", &self.state().config.git_exe);
 
         let mut bash_proc = Command::new("bash");
