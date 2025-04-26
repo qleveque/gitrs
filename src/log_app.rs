@@ -1,5 +1,5 @@
-use std::io::{BufReader, Lines};
-use std::process::ChildStdout;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use crate::action::Action;
 use crate::app::GitApp;
@@ -21,28 +21,43 @@ pub struct LogAppViewModel {
 
 pub struct LogApp {
     state: AppState,
-    lines: Vec<String>,
-    iterator: Lines<BufReader<ChildStdout>>,
-    loaded: bool,
+    lines: Arc<Mutex<Vec<String>>>,
     view_model: LogAppViewModel,
 }
 
 impl LogApp {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(args: Vec<String>) -> Result<Self, Error> {
         let state = AppState::new()?;
-        let iterator = git_log_output(&state.config)?;
+
+        let lines = Arc::new(Mutex::new(Vec::new()));
+
+        let list_data_clone = Arc::clone(&lines);
+        let git_exe = state.config.git_exe.clone();
+        thread::spawn(move || {
+            let n = 100;
+            // TODO: unwrap
+            let mut iterator = git_log_output(git_exe, args).unwrap();
+            loop {
+                // TODO: unwrap
+                let chunk: Vec<_> = match iterator.by_ref().take(n).collect::<Result<_, _>>() {
+                    Err(_) => continue, // invalid UTF-8 data ?,
+                    Ok(chunk) => chunk,
+                };
+                if chunk.is_empty() {
+                    break;
+                }
+                list_data_clone.lock().unwrap().extend(chunk);
+            }
+        });
 
         let mut r = Self {
             state,
-            lines: Vec::new(),
-            iterator,
-            loaded: false,
+            lines,
             view_model: LogAppViewModel {
                 list: ViewList::default(),
                 height: 0,
             },
         };
-        r.reload()?;
         r.state.list_state.select_first();
         Ok(r)
     }
@@ -58,35 +73,22 @@ impl GitApp for LogApp {
     }
 
     fn reload(&mut self) -> Result<(), Error> {
-        if !self.loaded {
-            let n = 100;
-            let chunk: Vec<_> = self.iterator.by_ref().take(n).collect::<Result<_, _>>()?;
-            if chunk.is_empty() {
-                self.loaded = true;
-            }
-            self.lines.extend(chunk);
-        }
-        self.view_model.list = ViewList::new(
-            &self.lines,
-            self.view_model.height,
-            &mut self.state,
-        );
-
         Ok(())
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
-        match self.lines.get(idx) {
-            Some(str) => Some(&str),
-            None => None,
-        }
+    fn get_text_line(&mut self, idx: usize) -> Option<String> {
+        self.lines.lock().unwrap().get(idx).cloned()
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        let _ = self.reload();
+        self.view_model.list = ViewList::new(
+            &self.lines.lock().unwrap(),
+            self.view_model.height,
+            &mut self.state,
+        );
         self.view_model.height = rect.height as usize;
         self.view_model.list.render(rect, frame.buffer_mut());
-        self.highlight_search(frame, &self.lines, rect);
+        self.highlight_search(frame, &self.lines.lock().unwrap(), rect);
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(&str, bool)> {

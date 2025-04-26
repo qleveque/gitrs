@@ -189,9 +189,9 @@ impl GitApp for StatusApp {
         &self.state
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
+    fn get_text_line(&mut self, idx: usize) -> Option<String> {
         match self.get_current_table().get(idx) {
-            Some((_, name)) => Some(&name),
+            Some((_, name)) => Some(name.to_string()),
             None => None,
         }
     }

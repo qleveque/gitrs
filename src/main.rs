@@ -57,9 +57,11 @@ enum Commands {
         /// Optional revision hash or reference
         revision: Option<String>,
     },
-
     /// Show git log
-    Log,
+    #[command(allow_hyphen_values = true)]
+    Log {
+        args: Vec<String>,
+    },
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {
@@ -67,7 +69,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
-        Commands::Log => LogApp::new()?.run(terminal),
+        Commands::Log { args } => LogApp::new(args)?.run(terminal),
     };
     ret
 }

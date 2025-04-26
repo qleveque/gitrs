@@ -125,9 +125,9 @@ impl GitApp for ShowApp {
         Ok(())
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<&str> {
+    fn get_text_line(&mut self, idx: usize) -> Option<String> {
         match self.commit.files.get(idx) {
-            Some(tuple) => Some(&tuple.1),
+            Some(tuple) => Some(tuple.1.clone()),
             None => None,
         }
     }

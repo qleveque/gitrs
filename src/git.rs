@@ -231,14 +231,12 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<Str
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-pub fn git_log_output(config: &Config) -> Result<Lines<BufReader<ChildStdout>>, Error> {
-    let args: Vec<String> = vec![
-        "log".to_string(),
-        "-p".to_string(),
-    ];
+pub fn git_log_output(git_exe: String, user_args: Vec<String>) -> Result<Lines<BufReader<ChildStdout>>, Error> {
+    let mut args: Vec<String> = vec!["log".to_string()];
+    args.extend(user_args);
 
     // Start the git log process
-    let command = Command::new(config.git_exe.clone())
+    let command = Command::new(git_exe)
         .args(args)
         .stdout(Stdio::piped())
         .spawn()?;

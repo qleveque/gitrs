@@ -33,7 +33,7 @@ pub trait GitApp {
         Ok(())
     }
     fn reload(&mut self) -> Result<(), Error>;
-    fn get_text_line(&mut self, _idx: usize) -> Option<&str>;
+    fn get_text_line(&mut self, _idx: usize) -> Option<String>;
 
     fn state(&mut self) -> &mut AppState;
     fn get_state(&self) -> &AppState;
@@ -98,7 +98,7 @@ pub trait GitApp {
                 .get_text_line(idx)
                 .ok_or_else(|| Error::ReachedLastMachted)?;
 
-            if regex.is_match(line) {
+            if regex.is_match(&line) {
                 self.state().list_state.select(Some(idx as usize));
                 return Ok(());
             }

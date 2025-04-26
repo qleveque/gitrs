@@ -19,6 +19,9 @@ impl ViewList {
     pub fn new(items: &Vec<String>, height: usize, app_state: &mut AppState) -> Self {
         let scroll_off = app_state.config.scroll_off;
         let mut index = app_state.list_state.selected().unwrap_or(0);
+        if items.len() == 0 {
+            return Self::default();
+        }
         if index >= items.len() {
             index = items.len() - 1;
         }
@@ -62,16 +65,15 @@ impl ViewList {
                     "Author:" => Color::Green,
                     "Date:" => Color::Yellow,
                     "---" | "+++" | "@@" | "index" | "diff" => Color::DarkGray,
-                    first_word => {
-                        match first_word.chars().next() {
-                            Some('-') => Color::Red,
-                            Some('+') => Color::Green,
-                            _ => Color::White,
-                        }
-                    }
+                    first_word => match first_word.chars().next() {
+                        Some('-') => Color::Red,
+                        Some('+') => Color::Green,
+                        _ => Color::White,
+                    },
                 };
                 return ListItem::new(s.to_string()).style(Style::from(color));
-            }).collect();
+            })
+            .collect();
         let inner = List::new(list_items)
             .block(Block::default().borders(Borders::NONE))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
