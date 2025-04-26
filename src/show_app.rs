@@ -174,7 +174,7 @@ impl GitApp for ShowApp {
         vec![(MappingScope::Show, true)]
     }
 
-    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
         let idx = self.idx()?;
         let file = self
             .commit
@@ -182,7 +182,7 @@ impl GitApp for ShowApp {
             .get(idx)
             .ok_or_else(|| Error::StateIndexError)?;
         let rev = Some(self.commit.hash.clone());
-        Ok((Some(file.1.clone()), rev))
+        Ok((Some(file.1.clone()), rev, None))
     }
 
     fn run_action(

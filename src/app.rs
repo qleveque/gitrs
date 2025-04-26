@@ -53,7 +53,7 @@ pub trait GitApp {
             .ok_or_else(|| Error::StateIndexError)
     }
     fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)>;
-    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error>;
+    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error>;
 
     fn run_action(
         &mut self,
@@ -86,22 +86,27 @@ pub trait GitApp {
                     if !self.loaded() {
                         // if not fully loaded yet, we need to continue the search
                         self.state().current_search_idx = Some(idx);
-                        return Ok(());
                     } else {
-                        self.state().current_search_idx = None;
-                        return Err(Error::ReachedLastMachted);
+                        self.stop_continued_search();
+                        self.notif(NotifChannel::Error, Error::ReachedLastMachted.to_string());
                     }
+                    return Ok(());
                 }
                 Some(line) => line,
             };
 
             if regex.is_match(&line) {
                 self.state().list_state.select(Some(idx as usize));
-                self.state().current_search_idx = None;
+                self.stop_continued_search();
                 return Ok(());
             }
             idx += 1;
         }
+    }
+
+    fn stop_continued_search(&mut self) {
+        self.state().current_search_idx = None;
+        self.state().notif.remove(&NotifChannel::Search);
     }
 
     fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
@@ -461,8 +466,15 @@ pub trait GitApp {
                 };
             }
             Action::Command(command_type, command) => {
-                let (file, rev) = self.get_file_and_rev()?;
-                self.run_command(terminal, &command_type, command.to_string(), file, rev)?;
+                let (file, rev, line) = self.get_file_rev_line()?;
+                self.run_command(
+                    terminal,
+                    &command_type,
+                    command.to_string(),
+                    file,
+                    rev,
+                    line,
+                )?;
             }
             Action::Search => {
                 self.state().search_string = "".to_string();
@@ -480,7 +492,7 @@ pub trait GitApp {
             Action::GoTo(line) => self.state().list_state.select(Some(*line)),
             Action::None => (),
             Action::ShowCommit => {
-                let (_, rev) = self.get_file_and_rev()?;
+                let (_, rev, _) = self.get_file_rev_line()?;
                 if let Some(rev) = rev {
                     terminal.clear()?;
                     ShowApp::new(Some(rev))?.run(terminal)?;
@@ -531,14 +543,18 @@ pub trait GitApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
         command_type: &CommandType,
         mut command: String,
-        filename: Option<String>,
-        revision: Option<String>,
+        file: Option<String>,
+        rev: Option<String>,
+        line: Option<usize>,
     ) -> Result<(), Error> {
-        if let Some(file) = filename {
+        if let Some(file) = file {
             command = command.replace("%(file)", &file);
         }
-        if let Some(rev) = revision {
+        if let Some(rev) = rev {
             command = command.replace("%(rev)", &rev);
+        }
+        if let Some(line) = line {
+            command = command.replace("%(line)", &format!("{}", line));
         }
         command = command.replace("%(git)", &self.state().config.git_exe);
 

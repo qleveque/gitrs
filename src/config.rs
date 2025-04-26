@@ -109,6 +109,13 @@ impl Default for Config {
                     ("<cr>".to_string(), Action::ShowCommit),
                     ("c".to_string(), Action::NextCommit),
                     ("C".to_string(), Action::PreviousCommit),
+                    (
+                        "d".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                        ),
+                    ),
                 ],
             ),
             (
@@ -147,10 +154,19 @@ impl Default for Config {
             ),
             (
                 MappingScope::StatusUnstaged,
-                vec![(
-                    "<cr>".to_string(),
-                    Action::Command(CommandType::Sync, "%(git) difftool -- %(file)".to_string()),
-                )],
+                vec![
+                    (
+                        "<cr>".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool -- %(file)".to_string(),
+                        ),
+                    ),
+                    (
+                        "!r".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) restore %(file)".to_string()),
+                    ),
+                ],
             ),
             (
                 MappingScope::StatusStaged,
@@ -160,6 +176,13 @@ impl Default for Config {
                         CommandType::Sync,
                         "%(git) difftool --staged -- %(file)".to_string(),
                     ),
+                )],
+            ),
+            (
+                MappingScope::StatusUntracked,
+                vec![(
+                    "!r".to_string(),
+                    Action::Command(CommandType::Sync, "rm %(file)".to_string()),
                 )],
             ),
         ]

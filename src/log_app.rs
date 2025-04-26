@@ -127,21 +127,52 @@ impl LogApp {
         Ok(str)
     }
 
-    fn read_log_line_rev(&self, mut line: String) -> Option<String> {
+    fn remove_graph_symbols(&self, line: &mut String) {
         // remove | and * graph chars
         if self.log_style == LogStyle::StandardGraph || self.log_style == LogStyle::OneLineGraph {
             loop {
                 if let Some(first_char) = line.chars().next() {
                     if first_char == '*' || first_char == '|' {
-                        line = line.chars().skip(2).collect();
+                        *line = line.chars().skip(2).collect();
                         continue;
                     }
-                } else {
-                    return None;
                 }
                 break;
             }
         }
+    }
+
+    fn get_line_file(&self, mut line: String) -> Option<String> {
+        if self.log_style == LogStyle::OneLine || self.log_style == LogStyle::OneLineGraph {
+            return None;
+        }
+        self.remove_graph_symbols(&mut line);
+        if line.starts_with("diff --git a/") {
+            if let Some((_, file)) = line.split_once(" b/") {
+                return Some(file.to_string());
+            }
+        }
+        return None;
+    }
+
+    fn get_line_line_number(&self, mut line: String) -> Option<usize> {
+        if self.log_style == LogStyle::OneLine || self.log_style == LogStyle::OneLineGraph {
+            return None;
+        }
+        self.remove_graph_symbols(&mut line);
+        if line.starts_with("@@ -") {
+            if let Some((_, line)) = line.split_once(" +") {
+                let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if let Ok(line_number) = line.parse() {
+                    return Some(line_number);
+                };
+            }
+        }
+        return None;
+    }
+
+    fn get_line_commit(&self, mut line: String) -> Option<String> {
+        self.remove_graph_symbols(&mut line);
         match self.log_style {
             LogStyle::StandardGraph | LogStyle::Standard => {
                 let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
@@ -210,14 +241,22 @@ impl GitApp for LogApp {
         vec![(MappingScope::Log, true)]
     }
 
-    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
         let mut idx = self.idx()?;
+        let mut rfile = None;
+        let mut rline = None;
         loop {
             let line = self
                 .get_stripped_line(idx)
                 .map_err(|_| Error::ReachedLastMachted)?;
-            if let Some(commit) = self.read_log_line_rev(line) {
-                return Ok((None, Some(commit)));
+            if rfile.is_none() {
+                rfile = self.get_line_file(line.clone());
+            }
+            if rline.is_none() {
+                rline = self.get_line_line_number(line.clone());
+            }
+            if let Some(commit) = self.get_line_commit(line) {
+                return Ok((rfile, Some(commit), rline));
             }
             if idx == 0 {
                 break;
@@ -225,7 +264,7 @@ impl GitApp for LogApp {
                 idx -= 1;
             }
         }
-        Ok((None, None))
+        Ok((None, None, None))
     }
 
     fn run_action(
@@ -240,12 +279,13 @@ impl GitApp for LogApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.read_log_line_rev(line) {
+                    if let Some(_) = self.get_line_commit(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
                     idx += 1;
                 }
+                *self.state.list_state.offset_mut() = self.idx()?;
             }
             Action::PreviousCommit => {
                 let mut idx = self.idx()?;
@@ -257,11 +297,12 @@ impl GitApp for LogApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.read_log_line_rev(line) {
+                    if let Some(_) = self.get_line_commit(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
                 }
+                *self.state.list_state.offset_mut() = self.idx()?;
             }
             action => {
                 self.run_generic_action(action, self.view_model.height, terminal)?;

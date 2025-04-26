@@ -307,12 +307,12 @@ impl GitApp for StatusApp {
         ]
     }
 
-    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
         let filename = match self.get_filename() {
             Ok(filename) => Some(filename),
             Err(_) => None,
         };
-        Ok((filename, Some("HEAD".to_string())))
+        Ok((filename, Some("HEAD".to_string()), None))
     }
 
     fn run_action(

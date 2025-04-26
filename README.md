@@ -82,6 +82,7 @@ gitrs blame <file> [line]
 | <kbd>!</kbd><kbd>n</kbd> | `git commit --amend --no-edit` |
 | <kbd>!</kbd><kbd>p</kbd> | `git push` |
 | <kbd>!</kbd><kbd>P</kbd> | `git push --force` |
+| <kbd>!</kbd><kbd>r</kbd> | Restore modified files or remove untracked files |
 
 </details>
 <details>
@@ -92,6 +93,7 @@ gitrs blame <file> [line]
 | <kbd>Enter</kbd> | Show commit details |
 | <kbd>c</kbd> | Next commit |
 | <kbd>C</kbd> | Previous commit |
+| <kbd>d</kbd> | Open current patch with `git difftool` |
 
 </details>
 <details>
@@ -126,6 +128,7 @@ An action can be a:
     * Placeholders:
         * `%(rev)` will be replaced by the current commit hash
         * `%(file)` will be replaced by the current file path
+        * `%(line)` will be replaced by the current context line
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`

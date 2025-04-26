@@ -301,13 +301,9 @@ impl GitApp for BlameApp {
         vec![(MappingScope::Blame, true)]
     }
 
-    fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        let commit_ref = self
-            .state
-            .list_state
-            .selected()
-            .and_then(|idx| self.blames.get(idx))
-            .and_then(|opt| opt.as_ref());
+    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
+        let idx = self.idx()?;
+        let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
 
         let rev = match commit_ref {
             Some(commit) => {
@@ -319,7 +315,7 @@ impl GitApp for BlameApp {
             }
             None => None,
         };
-        Ok((Some(self.file.clone()), rev))
+        Ok((Some(self.file.clone()), rev, Some(idx + 1)))
     }
 
     fn run_action(
