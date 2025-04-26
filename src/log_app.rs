@@ -19,6 +19,7 @@ struct LogAppViewModel {
     height: usize,
 }
 
+#[derive(PartialEq, Debug)]
 pub enum LogStyle {
     Standard,
     StandardGraph,
@@ -29,7 +30,7 @@ pub enum LogStyle {
 pub struct LogApp {
     state: AppState,
     lines: Arc<Mutex<Vec<String>>>,
-    _log_style: LogStyle,
+    log_style: LogStyle,
     view_model: LogAppViewModel,
 }
 
@@ -38,16 +39,19 @@ impl LogApp {
         let state = AppState::new()?;
         let git_exe = state.config.git_exe.clone();
         let mut iterator = git_log_output(git_exe, args).unwrap();
-        let first_line = iterator
+        let first_line_ansi = iterator
             .by_ref()
             .next()
             .ok_or_else(|| Error::GitParsingError)??;
+
+        let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
+        let first_line = String::from_utf8(bytes)?;
 
         let (first_word, other_words) = first_line
             .split_once(' ')
             .ok_or_else(|| Error::GitParsingError)?;
         // Hopefully this is enough
-        let _log_style = match first_word {
+        let log_style = match first_word {
             "commit" => LogStyle::Standard,
             "*" => {
                 let (second_word, _) = other_words
@@ -60,8 +64,9 @@ impl LogApp {
             }
             _ => LogStyle::OneLine,
         };
+        println!("{:?}", log_style);
 
-        let lines = Arc::new(Mutex::new(vec![first_line]));
+        let lines = Arc::new(Mutex::new(vec![first_line_ansi]));
         let list_data_clone = Arc::clone(&lines);
         thread::spawn(move || {
             let n = 100;
@@ -82,7 +87,7 @@ impl LogApp {
         let mut r = Self {
             state,
             lines,
-            _log_style,
+            log_style,
             view_model: LogAppViewModel {
                 list: ViewList::default(),
                 height: 0,
@@ -104,6 +109,43 @@ impl LogApp {
         let str = String::from_utf8(bytes)?;
         Ok(str)
     }
+
+    fn read_log_line_rev(&self, mut line: String) -> Option<String> {
+        // remove | and * graph chars
+        if self.log_style == LogStyle::StandardGraph || self.log_style == LogStyle::OneLineGraph {
+            loop {
+                if let Some(first_char) = line.chars().next() {
+                    if first_char == '*' || first_char == '|' {
+                        line = line.chars().skip(2).collect();
+                        continue;
+                    }
+                } else {
+                    return None;
+                }
+                break;
+            }
+        }
+        match self.log_style {
+            LogStyle::StandardGraph | LogStyle::Standard => {
+                let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
+                if first == "commit" {
+                    let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
+                    if !commit.is_empty() {
+                        return Some(commit.to_string());
+                    }
+                }
+            },
+            LogStyle::OneLineGraph | LogStyle::OneLine => {
+                // assume this is the first word
+                let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
+                if !commit.is_empty() {
+                    return Some(commit.to_string());
+                }
+            }
+        }
+        return None;
+    }
+
 }
 
 impl GitApp for LogApp {
@@ -146,14 +188,9 @@ impl GitApp for LogApp {
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
         let mut idx = self.idx()?;
         loop {
-
             let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
-            let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
-            if first == "commit" {
-                let (second, _) = rest.split_once(' ').unwrap_or((rest, ""));
-                if !second.is_empty() {
-                    return Ok((None, Some(second.to_string())));
-                }
+            if let Some(commit) = self.read_log_line_rev(line) {
+                return Ok((None, Some(commit)));
             }
             if idx == 0 {
                 break;
@@ -174,8 +211,7 @@ impl GitApp for LogApp {
                 let mut idx = self.idx()? + 1;
                 loop {
                     let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
-                    let (first, _) = line.split_once(' ').unwrap_or(("", ""));
-                    if first == "commit" {
+                    if let Some(_) = self.read_log_line_rev(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
@@ -189,9 +225,8 @@ impl GitApp for LogApp {
                         break;
                     }
                     idx -= 1;
-                    let line = self.get_stripped_line(idx)?;
-                    let (first, _) = line.split_once(' ').unwrap_or(("", ""));
-                    if first == "commit" {
+                    let line = self.get_stripped_line(idx).map_err(|_| Error::ReachedLastMachted)?;
+                    if let Some(_) = self.read_log_line_rev(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
