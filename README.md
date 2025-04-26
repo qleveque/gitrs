@@ -26,6 +26,8 @@
 - Asynchronous command execution
 - Minimal, fast, and intuitive interface
 
+Each view reimagines a common Git workflow to make it faster, simpler, and more user-friendly than traditional Git commands.
+
 ---
 
 ## Usage
@@ -36,8 +38,6 @@ gitrs log [...params]
 gitrs show [revision]
 gitrs blame <file> [line]
 ```
-
-Each view reimagines a common Git workflow to make it faster, simpler, and more user-friendly than traditional Git commands.
 
 ---
 
@@ -143,21 +143,21 @@ Configure gitrs by creating a `~/.gitrsrc` file.
 #### Mapping Hotkeys
 
 ```bash
-map <scope> <hotkey> <action>
+map <scope> <keys> <action>
 ```
 * scope: `global` | `show` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `log` | `blame`
-* hotkey: a vim-like key binding (e.g. `<c-x>E`)
+* keys: a vim-like key binding sequence (e.g. `<c-x>E`)
 
 #### Setting Options
 
 ```bash
-set {option} {value}
+set <option> <value>
 ```
 | Option | Description | Default | Type |
 |:---|:---|:---|:---|
 | `git` | Path to Git executable (useful for WSL: `git.exe`) | `"git"` | string |
 | `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
-| `smartcase` | Use smart case or not | `"true"` | "false" \| "true"` |
+| `smartcase` | Use smart case or not | `"true"` | `"false" \| "true"` |
 
 ---
 
