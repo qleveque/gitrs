@@ -5,9 +5,11 @@ use crate::config::{Config, MappingScope};
 
 use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
+use crate::ui::{age_to_color, highlight_style};
 
+use chrono::{NaiveDate, Utc};
 use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::StatefulWidget;
 
@@ -122,24 +124,29 @@ impl<'a> BlameApp {
     ) -> Line<'a> {
         match opt_commit {
             Some(commit) => {
+                let today = Utc::now().date_naive();
+                let past_date = NaiveDate::parse_from_str(
+                    &commit.date,
+                    "%Y-%m-%d",
+                ).unwrap_or(today.clone());
+                let age_color = age_to_color((today - past_date).num_days() as f32 / (365.0 * 2.0));
                 let displayed_hash: String = commit.hash.chars().take(4).collect();
                 let spans = vec![
                     Span::styled(displayed_hash, Style::from(Color::Blue)),
                     Span::raw(" "),
                     Span::styled(
                         format!("{:<max_author_len$}", commit.author.clone()),
-                        Style::from(Color::Yellow),
+                        Style::from(Color::Gray),
                     ),
                     Span::raw(" "),
-                    Span::styled(commit.date.clone(), Style::from(Color::Blue)),
+                    Span::styled(commit.date.clone(), Style::from(age_color)),
                     Span::raw(" "),
                     Span::styled(
                         format!("{:>max_line_len$}", idx + 1),
-                        Style::from(Color::Yellow),
+                        Style::from(Color::DarkGray),
                     ),
                 ];
-                let line = Line::from(spans);
-                line
+                Line::from(spans)
             }
             _ => Line::from("Not Committed Yet".to_string()),
         }
@@ -225,8 +232,12 @@ impl GitApp for BlameApp {
             .iter()
             .enumerate()
             .map(|(idx, opt_commit)| {
-                let display =
-                    BlameApp::displayed_blame_line(opt_commit, idx, max_author_len, max_line_len);
+                let display = BlameApp::displayed_blame_line(
+                    opt_commit,
+                    idx,
+                    max_author_len,
+                    max_line_len,
+                );
                 max_blame_len = max_blame_len.max(display.width());
                 ListItem::new(display)
             })
@@ -234,9 +245,7 @@ impl GitApp for BlameApp {
         self.view_model.max_blame_len = max_blame_len;
 
         self.view_model.blame_list = List::new(blame_items)
-            .block(Block::default())
-            .style(Style::from(Color::White))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            .highlight_style(highlight_style())
             .scroll_padding(self.state.config.scroll_off);
 
         let code_items: Vec<ListItem> = self
@@ -246,8 +255,7 @@ impl GitApp for BlameApp {
             .collect();
         self.view_model.code_list = List::new(code_items)
             .block(Block::default().borders(Borders::LEFT))
-            .style(Style::from(Color::White))
-            .highlight_style(Style::from(Color::Black).bg(Color::Gray))
+            .highlight_style(highlight_style())
             .scroll_padding(self.state.config.scroll_off);
 
         match self.state().list_state.selected() {

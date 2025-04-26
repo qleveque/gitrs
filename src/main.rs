@@ -9,6 +9,7 @@ mod log_app;
 mod show_app;
 mod status_app;
 mod view_list;
+mod ui;
 
 use std::io::{self, stdout};
 

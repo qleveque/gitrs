@@ -3,12 +3,11 @@ use std::cmp::min;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Modifier, Style},
     text::Text,
     widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget},
 };
 
-use crate::app_state::AppState;
+use crate::{app_state::AppState, ui::highlight_style};
 use ansi_to_tui::IntoText as _;
 
 #[derive(Clone)]
@@ -67,7 +66,7 @@ impl ViewList {
             .collect();
         let inner = List::new(list_items)
             .block(Block::default().borders(Borders::NONE))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
+            .highlight_style(highlight_style());
         Self { inner, state }
     }
 
