@@ -10,3 +10,5 @@ syntect = "5.2.0"
 clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0.12"
 regex = "1.11.1"
+ansi-to-tui = "7.0.0"
+strip-ansi-escapes = "0.2.1"

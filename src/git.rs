@@ -235,7 +235,7 @@ pub fn git_log_output(
     git_exe: String,
     user_args: Vec<String>,
 ) -> Result<Lines<BufReader<ChildStdout>>, Error> {
-    let mut args: Vec<String> = vec!["log".to_string()];
+    let mut args: Vec<String> = vec!["log".to_string(), "--color=always".to_string()];
     args.extend(user_args);
 
     // Start the git log process

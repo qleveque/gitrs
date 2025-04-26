@@ -189,7 +189,7 @@ impl GitApp for StatusApp {
         &self.state
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<String> {
+    fn get_text_line(&self, idx: usize) -> Option<String> {
         match self.get_current_table().get(idx) {
             Some((_, name)) => Some(name.to_string()),
             None => None,
@@ -267,15 +267,8 @@ impl GitApp for StatusApp {
             StagedStatus::Unstaged => chunks[0],
             StagedStatus::Staged => chunks[1],
         };
-        // need to improve that
-        let table: Vec<String> = self
-            .get_current_table()
-            .iter()
-            .map(|x| x.1.clone())
-            .collect();
         self.highlight_search(
             frame,
-            &table,
             Rect {
                 x: rect.x + chunk.x + 2,
                 y: chunk.y + 1,

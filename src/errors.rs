@@ -1,9 +1,13 @@
+use std::string::FromUtf8Error;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("unknown action `{0}`")]
     ParseActionError(String),
+    #[error("error parsing utf-8")]
+    ParseUtf8Error(#[from] FromUtf8Error),
     #[error("unable to set variable `{0}`")]
     ParseVariableError(String),
     #[error("invalid state index")]

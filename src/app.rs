@@ -34,7 +34,7 @@ pub trait GitApp {
         Ok(())
     }
     fn reload(&mut self) -> Result<(), Error>;
-    fn get_text_line(&mut self, _idx: usize) -> Option<String>;
+    fn get_text_line(&self, _idx: usize) -> Option<String>;
 
     fn state(&mut self) -> &mut AppState;
     fn get_state(&self) -> &AppState;
@@ -126,40 +126,42 @@ pub trait GitApp {
         *chunk = chunks[0];
     }
 
-    fn highlight_search(&self, frame: &mut Frame, lines: &Vec<String>, rect: Rect) {
+    fn highlight_search(&self, frame: &mut Frame, rect: Rect) {
         if self.get_state().search_string.is_empty() || rect.width == 0 {
             return;
         }
         let first = self.get_state().list_state.offset();
-        let last = min(first + rect.height as usize, lines.len());
+        let last = first + rect.height as usize;
         if let Ok(regex) = self.search_regex() {
-            for (idx, line) in lines[first..last].iter().enumerate() {
-                for mat in regex.find_iter(&line) {
-                    let match_start = mat.start() as u16;
-                    let match_width = (mat.end() - mat.start()) as u16;
-                    if match_start >= rect.width {
-                        // result too far on the right
-                        continue;
-                    }
-                    let x = match_start;
-                    let x2 = min(x + match_width, rect.width);
-                    let width = x2 - x;
+            for idx in first..last {
+                if let Some(line) = self.get_text_line(idx) {
+                    for mat in regex.find_iter(&line) {
+                        let match_start = mat.start() as u16;
+                        let match_width = (mat.end() - mat.start()) as u16;
+                        if match_start >= rect.width {
+                            // result too far on the right
+                            continue;
+                        }
+                        let x = match_start;
+                        let x2 = min(x + match_width, rect.width);
+                        let width = x2 - x;
 
-                    let draw_rect = Rect {
-                        x: rect.x + x,
-                        y: rect.y + idx as u16,
-                        width,
-                        height: 1,
-                    };
-                    frame.render_widget(Clear, draw_rect);
-                    frame.render_widget(
-                        Paragraph::new(mat.as_str()).style(
-                            Style::from(Color::DarkGray)
-                                .bg(Color::LightYellow)
-                                .add_modifier(Modifier::REVERSED),
-                        ),
-                        draw_rect,
-                    );
+                        let draw_rect = Rect {
+                            x: rect.x + x,
+                            y: rect.y + (idx - first) as u16,
+                            width,
+                            height: 1,
+                        };
+                        frame.render_widget(Clear, draw_rect);
+                        frame.render_widget(
+                            Paragraph::new(mat.as_str()).style(
+                                Style::from(Color::DarkGray)
+                                    .bg(Color::LightYellow)
+                                    .add_modifier(Modifier::REVERSED),
+                            ),
+                            draw_rect,
+                        );
+                    }
                 }
             }
         }

@@ -21,7 +21,7 @@ use ratatui::{
 
 use std::env;
 
-pub struct ShowAppViewModel {
+struct ShowAppViewModel {
     file_list: List<'static>,
     commit_paragraph: Paragraph<'static>,
     files_height: usize,
@@ -125,7 +125,7 @@ impl GitApp for ShowApp {
         Ok(())
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<String> {
+    fn get_text_line(&self, idx: usize) -> Option<String> {
         match self.commit.files.get(idx) {
             Some(tuple) => Some(tuple.1.clone()),
             None => None,
@@ -158,10 +158,8 @@ impl GitApp for ShowApp {
         );
         self.view_model.files_height = chunks[1].height as usize;
 
-        let table: Vec<String> = self.commit.files.iter().map(|x| x.1.clone()).collect();
         self.highlight_search(
             frame,
-            &table,
             Rect {
                 x: rect.x + chunks[1].x + 2,
                 y: chunks[1].y,

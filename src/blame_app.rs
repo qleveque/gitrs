@@ -27,7 +27,7 @@ use syntect::util::LinesWithEndings;
 
 use std::path::Path;
 
-pub struct BlameAppViewModel {
+struct BlameAppViewModel {
     height: usize,
     blame_list: List<'static>,
     code_list: List<'static>,
@@ -190,7 +190,7 @@ impl GitApp for BlameApp {
         &self.state
     }
 
-    fn get_text_line(&mut self, idx: usize) -> Option<String> {
+    fn get_text_line(&self, idx: usize) -> Option<String> {
         self.code.get(idx).cloned()
     }
 
@@ -288,7 +288,6 @@ impl GitApp for BlameApp {
 
         self.highlight_search(
             frame,
-            &self.code,
             Rect {
                 x: rect.x + chunks[1].x + 1,
                 y: rect.y,

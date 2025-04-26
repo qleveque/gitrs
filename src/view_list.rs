@@ -3,11 +3,13 @@ use std::cmp::min;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
+    text::Text,
     widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget},
 };
 
 use crate::app_state::AppState;
+use ansi_to_tui::IntoText as _;
 
 #[derive(Clone)]
 pub struct ViewList {
@@ -59,19 +61,8 @@ impl ViewList {
         let list_items: Vec<ListItem> = items[first..last]
             .into_iter()
             .map(|s| {
-                let (first_word, _) = s.split_once(' ').unwrap_or((s, ""));
-                let color = match first_word {
-                    "commit" => Color::Blue,
-                    "Author:" => Color::Green,
-                    "Date:" => Color::Yellow,
-                    "---" | "+++" | "@@" | "index" | "diff" => Color::DarkGray,
-                    first_word => match first_word.chars().next() {
-                        Some('-') => Color::Red,
-                        Some('+') => Color::Green,
-                        _ => Color::White,
-                    },
-                };
-                return ListItem::new(s.to_string()).style(Style::from(color));
+                let text = s.as_bytes().into_text().unwrap_or(Text::default());
+                return ListItem::new(text);
             })
             .collect();
         let inner = List::new(list_items)
