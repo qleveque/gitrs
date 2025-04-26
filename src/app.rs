@@ -441,8 +441,8 @@ pub trait GitApp {
             Action::First => self.state().list_state.select_first(),
             Action::Last => self.state().list_state.select_last(),
             Action::Quit => self.state().quit = true,
-            Action::HalfPageUp => self.state().list_state.scroll_up_by(height as u16 / 3),
-            Action::HalfPageDown => self.state().list_state.scroll_down_by(height as u16 / 3),
+            Action::HalfPageUp => self.state().list_state.scroll_up_by(height as u16 / 2),
+            Action::HalfPageDown => self.state().list_state.scroll_down_by(height as u16 / 2),
             Action::ShiftLineMiddle => {
                 let idx = self.idx()?;
                 if idx > height / 2 {

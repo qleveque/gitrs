@@ -166,7 +166,10 @@ impl<'a> BlameApp {
             let (blame, code) = line.split_once(')').ok_or_else(|| Error::GitParsingError)?;
             code_column.push(code.to_string());
             let blame_text = blame.to_string() + ")";
-            let (hash, blame_text) = blame_text
+            let (hash, _) = blame_text
+                .split_once(" ")
+                .ok_or_else(|| Error::GitParsingError)?;
+            let (_, blame_text) = blame_text
                 .split_once(" (")
                 .ok_or_else(|| Error::GitParsingError)?;
             // for initial commit
