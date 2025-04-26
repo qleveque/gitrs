@@ -4,7 +4,7 @@ use std::thread;
 
 use crate::action::Action;
 use crate::app::GitApp;
-use crate::app_state::AppState;
+use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
@@ -69,7 +69,6 @@ impl LogApp {
             }
             _ => LogStyle::OneLine,
         };
-        println!("{:?}", log_style);
 
         let lines = Arc::new(Mutex::new(vec![first_line_ansi]));
         let lines_clone = Arc::clone(&lines);
@@ -189,8 +188,12 @@ impl GitApp for LogApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        // self.state.notif.clear();
-        // self.info(&format!("lines: {}", self.lines.lock().unwrap().len()));
+        if !self.loaded() {
+            let message = format!("loading lines {}...", self.lines.lock().unwrap().len());
+            self.notif(NotifChannel::Loading, message);
+        } else {
+            self.state.notif.remove(&NotifChannel::Loading);
+        }
         self.view_model.list = ViewList::new(
             &self.lines.lock().unwrap(),
             self.view_model.height,

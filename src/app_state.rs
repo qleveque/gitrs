@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ratatui::widgets::ListState;
 
 use crate::{
@@ -5,16 +7,12 @@ use crate::{
     errors::Error,
 };
 
-#[derive(Clone)]
-pub enum NotifType {
-    Info,
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum NotifChannel {
+    Search,
+    Loading,
+    Keys,
     Error,
-}
-
-#[derive(Clone)]
-pub struct Notif {
-    pub notif_type: NotifType,
-    pub message: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -27,7 +25,7 @@ pub enum InputState {
 pub struct AppState {
     pub quit: bool,
     pub config: Config,
-    pub notif: Vec<Notif>,
+    pub notif: HashMap<NotifChannel, String>,
     pub key_combination: String,
     pub search_string: String,
     pub search_reverse: bool,
@@ -42,7 +40,7 @@ impl AppState {
         let r = Self {
             quit: false,
             config: parse_gitrs_config()?,
-            notif: Vec::new(),
+            notif: HashMap::new(),
             key_combination: "".to_string(),
             search_string: "".to_string(),
             search_reverse: false,

@@ -1,10 +1,11 @@
 use std::{
     cmp::min,
+    collections::HashMap,
     io::stdout,
     process::{Command, Stdio},
 };
 
-use crate::config::MappingScope;
+use crate::{app_state::NotifChannel, config::MappingScope};
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
@@ -23,10 +24,12 @@ use ratatui::{
 
 use crate::{
     action::{Action, CommandType},
-    app_state::{AppState, InputState, Notif, NotifType},
+    app_state::{AppState, InputState},
     errors::Error,
     show_app::ShowApp,
 };
+
+const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
 
 pub trait GitApp {
     fn draw(&mut self, frame: &mut Frame, rect: Rect);
@@ -58,17 +61,8 @@ pub trait GitApp {
         _terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error>;
 
-    fn notif(&mut self, notif_type: NotifType, message: &str) {
-        self.state().notif.push(Notif {
-            notif_type,
-            message: message.to_string(),
-        });
-    }
-    fn info(&mut self, message: &str) {
-        self.notif(NotifType::Info, message);
-    }
-    fn error(&mut self, message: &str) {
-        self.notif(NotifType::Error, message);
+    fn notif(&mut self, notif_channel: NotifChannel, message: String) {
+        self.state().notif.insert(notif_channel, message);
     }
 
     fn search_regex(&self) -> Result<Regex, Error> {
@@ -84,7 +78,7 @@ pub trait GitApp {
         Ok(regex)
     }
 
-    fn continue_search(&mut self, mut idx: usize) -> Result<(), Error>{
+    fn continue_search(&mut self, mut idx: usize) -> Result<(), Error> {
         let regex = self.search_regex()?;
         loop {
             let line = match self.get_text_line(idx) {
@@ -97,7 +91,7 @@ pub trait GitApp {
                         self.state().current_search_idx = None;
                         return Err(Error::ReachedLastMachted);
                     }
-                },
+                }
                 Some(line) => line,
             };
 
@@ -130,13 +124,15 @@ pub trait GitApp {
                     if !self.loaded() {
                         assert_eq!(reversed, false);
                         // if not fully loaded yet, we need to continue the search
-                        self.info("searching...");
+                        let message =
+                            format!("searching for `{}`...", self.get_state().search_string);
+                        self.notif(NotifChannel::Search, message);
                         self.state().current_search_idx = Some(idx);
                         return Ok(());
                     } else {
                         return Err(Error::ReachedLastMachted);
                     }
-                },
+                }
                 Some(line) => line,
             };
 
@@ -221,21 +217,29 @@ pub trait GitApp {
         *chunk = chunks[0];
     }
 
-    fn display_notifications(&mut self, chunk: &mut Rect, frame: &mut Frame) {
+    fn display_notifications(&mut self, chunk: &mut Rect, frame: &mut Frame, loading_char: char) {
         let lines: Vec<Line> = self
             .state()
             .notif
             .iter()
-            .map(|notif| {
-                let line_style = match notif.notif_type {
-                    NotifType::Info => Style::from(Color::Blue),
-                    NotifType::Error => Style::from(Color::Red),
+            .map(|(notif_channel, message)| {
+                let line_style = match notif_channel {
+                    NotifChannel::Error => Style::from(Color::Red),
+                    _ => Style::from(Color::Blue),
                 };
-                Line::styled(notif.message.to_string(), line_style)
+                let mut message = message.clone();
+                match notif_channel {
+                    NotifChannel::Search | NotifChannel::Loading => {
+                        message.push(' ');
+                        message.push(loading_char);
+                    }
+                    _ => (),
+                };
+                Line::styled(message.to_string(), line_style)
             })
             .collect();
         let paragraph = Paragraph::new(Text::from(lines))
-            .block(Block::default().borders(Borders::TOP).title("Messages"));
+            .block(Block::default().borders(Borders::TOP).title("Notifs"));
 
         let len = self.state().notif.len() as u16 + 1;
         let chunks = Layout::default()
@@ -251,6 +255,7 @@ pub trait GitApp {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
+        let mut notif_time = 0;
         loop {
             terminal.draw(|mut frame| {
                 let mut chunk = frame.area();
@@ -264,25 +269,29 @@ pub trait GitApp {
                     self.display_cmd_line(&mut chunk, &mut frame);
                 }
                 if !self.state().notif.is_empty() {
-                    self.display_notifications(&mut chunk, &mut frame);
+                    self.display_notifications(&mut chunk, &mut frame, SPINNER_FRAMES[notif_time]);
+                    notif_time = (notif_time + 1) % 8;
                 }
             })?;
 
+            // continue search if one is active
             if let Some(search_idx) = self.state().current_search_idx {
                 self.continue_search(search_idx)?;
-                continue;
             }
+
             let opt_action = match self.handle_user_input() {
                 Err(err) => {
-                    self.error(&err.to_string());
+                    self.notif(NotifChannel::Error, err.to_string());
                     None
                 }
                 Ok(opt_action) => opt_action,
             };
 
             if let Some(action) = opt_action {
+                // stop search in case there is a new action
+                self.state().current_search_idx = None;
                 match self.run_action(&action, terminal) {
-                    Err(err) => self.error(&err.to_string()),
+                    Err(err) => self.notif(NotifChannel::Error, err.to_string()),
                     Ok(()) => (),
                 }
                 if self.state().quit {
@@ -293,7 +302,8 @@ pub trait GitApp {
             // display key combination if multiple letters
             let key_combination = self.state().key_combination.clone();
             if self.state().notif.is_empty() && !key_combination.is_empty() {
-                self.info(&format!("Keys: {}", key_combination));
+                let message = format!("Keys: {}", key_combination);
+                self.notif(NotifChannel::Keys, message);
             }
         }
         self.on_exit()?;
@@ -346,7 +356,8 @@ pub trait GitApp {
                 };
             }
             _ => {
-                self.error("error: this char is not handled yet");
+                let message = "error: this char is not handled yet".to_string();
+                self.notif(NotifChannel::Error, message);
             }
         }
         Ok(None)
@@ -504,7 +515,8 @@ pub trait GitApp {
                 return Ok(None);
             }
         };
-        self.state().notif = Vec::new();
+        // when user press key, we clear the messages
+        self.state().notif = HashMap::new();
 
         let input_state = self.state().input_state.clone();
         if input_state == InputState::App {
