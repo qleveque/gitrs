@@ -37,6 +37,8 @@ pub enum Action {
     ShowCommit,
     NextCommitBlame,
     PreviousCommitBlame,
+    NextCommit,
+    PreviousCommit,
     None,
 }
 
@@ -68,6 +70,8 @@ impl FromStr for Action {
             "show_commit" => Ok(Action::ShowCommit),
             "next_commit_blame" => Ok(Action::NextCommitBlame),
             "previous_commit_blame" => Ok(Action::PreviousCommitBlame),
+            "next_commit" => Ok(Action::NextCommit),
+            "previous_commit" => Ok(Action::PreviousCommit),
             "nop" => Ok(Action::None),
             cmd => {
                 if let Ok(number) = cmd.parse::<usize>() {

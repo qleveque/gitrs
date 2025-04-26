@@ -24,6 +24,7 @@ use crate::{
     action::{Action, CommandType},
     app_state::{AppState, InputState, Notif, NotifType},
     errors::Error,
+    show_app::ShowApp,
 };
 
 pub trait GitApp {
@@ -415,6 +416,14 @@ pub trait GitApp {
             Action::PreviousSearchResult => self.search_result(true)?,
             Action::GoTo(line) => self.state().list_state.select(Some(*line)),
             Action::None => (),
+            Action::ShowCommit => {
+                let (_, rev) = self.get_file_and_rev()?;
+                if let Some(rev) = rev {
+                    terminal.clear()?;
+                    ShowApp::new(Some(rev))?.run(terminal)?;
+                    terminal.clear()?;
+                };
+            }
             action => {
                 return Err(Error::GlobalError(format!(
                     "cannot run `{:?}` in this context",

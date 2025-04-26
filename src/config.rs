@@ -121,6 +121,14 @@ impl Default for Config {
                     ),
                 )],
             ),
+            (
+                "log".to_string(),
+                vec![
+                    ("<cr>".to_string(), Action::ShowCommit),
+                    ("c".to_string(), Action::NextCommit),
+                    ("C".to_string(), Action::PreviousCommit),
+                ],
+            ),
         ]
         .into_iter()
         .collect();

@@ -59,9 +59,7 @@ enum Commands {
     },
     /// Show git log
     #[command(allow_hyphen_values = true)]
-    Log {
-        args: Vec<String>,
-    },
+    Log { args: Vec<String> },
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {

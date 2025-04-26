@@ -5,7 +5,6 @@ use crate::config::Config;
 
 use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
-use crate::show_app::ShowApp;
 
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -304,12 +303,23 @@ impl GitApp for BlameApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
-        let rev = self
+        let commit_ref = self
             .state
             .list_state
             .selected()
             .and_then(|idx| self.blames.get(idx))
-            .and_then(|opt_commit| opt_commit.as_ref().map(|commit| commit.hash.clone()));
+            .and_then(|opt| opt.as_ref());
+
+        let rev = match commit_ref {
+            Some(commit) => {
+                if commit.hash.starts_with('^') {
+                    Some(commit.hash[1..].to_string())
+                } else {
+                    Some(commit.hash.clone())
+                }
+            }
+            None => None,
+        };
         Ok((Some(self.file.clone()), rev))
     }
 
@@ -339,25 +349,6 @@ impl GitApp for BlameApp {
                 };
                 self.revisions.push(Some(rev.clone()));
                 self.reload()?;
-            }
-            Action::ShowCommit => {
-                let commit_ref = self
-                    .state
-                    .list_state
-                    .selected()
-                    .and_then(|idx| self.blames.get(idx))
-                    .and_then(|opt| opt.as_ref());
-
-                if let Some(commit) = commit_ref {
-                    let rev = if commit.hash.starts_with('^') {
-                        Some(commit.hash[1..].to_string())
-                    } else {
-                        Some(commit.hash.clone())
-                    };
-                    terminal.clear()?;
-                    ShowApp::new(rev)?.run(terminal)?;
-                    terminal.clear()?;
-                };
             }
             _ => {
                 self.run_generic_action(action, self.view_model.height, terminal)?;

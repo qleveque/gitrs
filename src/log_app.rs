@@ -96,6 +96,24 @@ impl GitApp for LogApp {
     }
 
     fn get_file_and_rev(&self) -> Result<(Option<String>, Option<String>), Error> {
+        let mut idx = self.idx()?;
+        loop {
+            let line = self.lines.lock().unwrap().get(idx).cloned();
+            if let Some(line) = line {
+                let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
+                if first == "commit" {
+                    let (second, _) = rest.split_once(' ').unwrap_or((rest, ""));
+                    if !second.is_empty() {
+                        return Ok((None, Some(second.to_string())));
+                    }
+                }
+            }
+            if idx == 0 {
+                break;
+            } else {
+                idx -= 1;
+            }
+        }
         Ok((None, None))
     }
 
@@ -104,7 +122,44 @@ impl GitApp for LogApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        self.run_generic_action(action, self.view_model.height, terminal)?;
+        match action {
+            Action::NextCommit => {
+                let mut idx = self.idx()? + 1;
+                loop {
+                    let line = self.lines.lock().unwrap().get(idx).cloned();
+                    if let Some(line) = line {
+                        let (first, _) = line.split_once(' ').unwrap_or(("", ""));
+                        if first == "commit" {
+                            self.state.list_state.select(Some(idx));
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                    idx += 1;
+                }
+            }
+            Action::PreviousCommit => {
+                let mut idx = self.idx()?;
+                loop {
+                    if idx == 0 {
+                        break;
+                    }
+                    idx -= 1;
+                    let line = self.lines.lock().unwrap().get(idx).cloned();
+                    if let Some(line) = line {
+                        let (first, _) = line.split_once(' ').unwrap_or(("", ""));
+                        if first == "commit" {
+                            self.state.list_state.select(Some(idx));
+                            break;
+                        }
+                    }
+                }
+            }
+            action => {
+                self.run_generic_action(action, self.view_model.height, terminal)?;
+            }
+        }
         return Ok(());
     }
 }

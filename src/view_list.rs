@@ -59,7 +59,7 @@ impl ViewList {
         let list_items: Vec<ListItem> = items[first..last]
             .into_iter()
             .map(|s| {
-                let (first_word, _) = s.split_once(' ').unwrap_or(("", ""));
+                let (first_word, _) = s.split_once(' ').unwrap_or((s, ""));
                 let color = match first_word {
                     "commit" => Color::Blue,
                     "Author:" => Color::Green,

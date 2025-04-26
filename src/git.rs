@@ -231,7 +231,10 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<Str
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-pub fn git_log_output(git_exe: String, user_args: Vec<String>) -> Result<Lines<BufReader<ChildStdout>>, Error> {
+pub fn git_log_output(
+    git_exe: String,
+    user_args: Vec<String>,
+) -> Result<Lines<BufReader<ChildStdout>>, Error> {
     let mut args: Vec<String> = vec!["log".to_string()];
     args.extend(user_args);
 
