@@ -141,7 +141,7 @@ impl StatusApp {
         state.list_state.select_first();
         let mut instance = Self {
             state,
-            staged_status: StagedStatus::Unstaged, // TODO: should be staged if unstaged empty
+            staged_status: StagedStatus::Unstaged,
             unstaged_table: Vec::new(),
             staged_table: Vec::new(),
             git_files: HashMap::new(),

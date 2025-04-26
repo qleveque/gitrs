@@ -70,15 +70,19 @@ impl LogApp {
         let list_data_clone = Arc::clone(&lines);
         thread::spawn(move || {
             let n = 100;
-            // TODO: unwrap
             loop {
-                // TODO: unwrap
-                let chunk: Vec<_> = match iterator.by_ref().take(n).collect::<Result<_, _>>() {
-                    Err(_) => continue, // invalid UTF-8 data ?,
-                    Ok(chunk) => chunk,
-                };
-                if chunk.is_empty() {
-                    break;
+                let mut chunk = Vec::with_capacity(n);
+                for _ in 0..n {
+                    let next = iterator.by_ref().next();
+                    match next {
+                        Some(res_line) => {
+                            chunk.push(match res_line {
+                                Ok(line) => line,
+                                Err(_) => "\x1b[31m/!\\ *** ERROR *** /!\\: gitrs could not read that line\x1b[0m".to_string(),
+                            })
+                        }
+                        None => break,
+                    }
                 }
                 list_data_clone.lock().unwrap().extend(chunk);
             }
