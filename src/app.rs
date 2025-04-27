@@ -5,7 +5,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{app_state::NotifChannel, config::MappingScope, pager_app::{PagerApp, PagerCommand}};
+use crate::{app_state::NotifChannel, config::MappingScope, pager_app::{PagerApp, PagerCommand}, ui::search_highlight_style};
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
@@ -16,7 +16,7 @@ use crossterm::{
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     prelude::CrosstermBackend,
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Line, Text},
     widgets::{Block, Borders, Clear, Paragraph, Widget},
     Frame, Terminal,
@@ -196,11 +196,7 @@ pub trait GitApp {
                         };
                         frame.render_widget(Clear, draw_rect);
                         frame.render_widget(
-                            Paragraph::new(mat.as_str()).style(
-                                Style::from(Color::DarkGray)
-                                    .bg(Color::LightYellow)
-                                    .add_modifier(Modifier::REVERSED),
-                            ),
+                            Paragraph::new(mat.as_str()).style(search_highlight_style()),
                             draw_rect,
                         );
                     }

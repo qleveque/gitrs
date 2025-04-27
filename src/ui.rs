@@ -1,9 +1,15 @@
 use chrono::{NaiveDate, Utc};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 
 
 pub fn highlight_style() -> Style {
      Style::from(Color::Rgb(255, 255, 255)).bg(Color::DarkGray)
+}
+
+pub fn search_highlight_style() -> Style {
+    Style::from(Color::DarkGray)
+        .bg(Color::Rgb(255, 255, 0))
+        .add_modifier(Modifier::REVERSED)
 }
 
 pub fn date_to_color(date: &str) -> Color {

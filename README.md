@@ -86,8 +86,8 @@ gitrs blame <file> [line]
 | <kbd>!</kbd><kbd>c</kbd> | `git commit` |
 | <kbd>!</kbd><kbd>a</kbd> | `git commit --amend` |
 | <kbd>!</kbd><kbd>n</kbd> | `git commit --amend --no-edit` |
-| <kbd>!</kbd><kbd>p</kbd> | `git push` |
-| <kbd>!</kbd><kbd>P</kbd> | `git push --force` |
+| <kbd>!</kbd><kbd>p</kbd> | `git push` and quit |
+| <kbd>!</kbd><kbd>P</kbd> | `git push --force` and quit |
 | <kbd>!</kbd><kbd>r</kbd> | Restore modified files or remove untracked files |
 
 </details>
