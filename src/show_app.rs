@@ -42,8 +42,7 @@ impl ShowApp {
         set_git_dir(&state.config);
 
         let output = git_show_output(&revision, &state.config)?;
-        let mut lines = output.lines().map(String::from);
-        let (mut commit, _) = git_parse_commit(&mut lines);
+        let mut commit = git_parse_commit(&output)?;
         commit
             .files
             .sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));

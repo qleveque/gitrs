@@ -149,24 +149,16 @@ pub fn git_blame_output(file: String, revision: Option<String>, config: &Config)
         .replace("\t", "    ")
 }
 
-// TODO: simplify this method
-pub fn git_parse_commit<I>(lines: &mut I) -> (Commit, bool)
-where
-    I: Iterator<Item = String>,
-{
-    // Capture metadata
+pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
+    let mut lines = output.lines().map(String::from);
     let mut metadata: Vec<String> = Vec::new();
 
-    let line = lines.next().unwrap();
-    let commit_hash = line.split_whitespace().nth(1).unwrap();
+    // Parse commit hash
+    let line = lines.next().ok_or_else(|| Error::GitParsingError)?;
+    let commit_hash = line.split_whitespace().nth(1).ok_or_else(|| Error::GitParsingError)?;
     metadata.push(line.clone());
 
-    let line = lines.next().unwrap();
-    metadata.push(line.clone());
-
-    let line = lines.next().unwrap();
-    metadata.push(line.clone());
-
+    // Read all metadata
     while let Some(line) = lines.next() {
         if line.len() == 0 {
             metadata.push("".to_string());
@@ -175,46 +167,36 @@ where
         metadata.push(line.to_string());
     }
 
+    // Read commit message and files
     let mut parsing_files = false;
-    let mut end = false;
     let mut files: Vec<(FileStatus, String)> = Vec::new();
-    let mut commit_title = "".to_string();
 
-    loop {
-        match lines.next() {
-            Some(line) => {
-                if !parsing_files {
-                    if !line.chars().next().unwrap_or(' ').is_whitespace() {
-                        parsing_files = true;
-                    } else {
-                        if commit_title.len() == 0 && line.len() > 0 {
-                            commit_title = line.clone().trim().to_string();
-                        }
-                        metadata.push(line.to_string());
-                    }
-                }
-                if parsing_files {
-                    let status = match line.chars().next() {
-                        Some('M') => FileStatus::Modified,
-                        Some('A') => FileStatus::New,
-                        Some('D') => FileStatus::Deleted,
-                        _ => break,
-                    };
-                    let filename = line.split('\t').nth(1).unwrap().to_string();
-                    files.push((status, filename));
-                }
+    while let Some(line) = lines.next() {
+        if !parsing_files {
+            if !line.chars().next().unwrap_or(' ').is_whitespace() {
+                parsing_files = true;
+            } else {
+                metadata.push(line.to_string());
             }
-            None => {
-                end = true;
-                break;
-            }
+        }
+        if parsing_files {
+            let status = match line.chars().next() {
+                Some('M') => FileStatus::Modified,
+                Some('A') => FileStatus::New,
+                Some('D') => FileStatus::Deleted,
+                _ => break,
+            };
+            let filename = line.split('\t').nth(1).ok_or_else(|| Error::GitParsingError)?.to_string();
+            files.push((status, filename));
         }
     }
 
-    (
-        Commit::new(metadata.join("\n"), files, commit_hash.to_string()),
-        end,
-    )
+    let commit = Commit::new(
+        metadata.join("\n"),
+        files,
+        commit_hash.to_string()
+    );
+    Ok(commit)
 }
 
 pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
