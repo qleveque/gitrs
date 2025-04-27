@@ -20,7 +20,7 @@
 
 ## Features
 
-- Status, Log, Show, Reflog, Files, and Blame views
+- Status, Log, Show, Reflog, Files, Blame and Stash views
 - Highly customizable key mappings
 - Built-in and shell action support
 - Asynchronous command execution
@@ -37,6 +37,7 @@ gitrs status
 gitrs log [...params]
 gitrs show [...params]
 gitrs reflog [...params]
+gitrs stash
 gitrs files [revision]
 gitrs blame <file> [line]
 ```
@@ -91,15 +92,27 @@ gitrs blame <file> [line]
 
 </details>
 <details>
-<summary><strong>Log, Show, Reflog </strong></summary>
+<summary><strong>Log, Show, Reflog</strong></summary>
 
 | Key | Action |
 |:---|:---|
-| <kbd>Enter</kbd> | Open files view |
-| <kbd>s</kbd> | Open show view |
+| <kbd>Enter</kbd> | Open Files view |
+| <kbd>s</kbd> | Open Show view |
 | <kbd>c</kbd> | Next commit |
 | <kbd>C</kbd> | Previous commit |
 | <kbd>d</kbd> | Open current patch with `git difftool` |
+
+</details>
+<details>
+<summary><strong>Stash</strong></summary>
+
+| Key | Action |
+|:---|:---|
+| <kbd>Enter</kbd> | Open Files view |
+| <kbd>s</kbd> | Open Show view |
+| <kbd>!</kbd><kbd>a</kbd> | `git stash apply` |
+| <kbd>!</kbd><kbd>p</kbd> | `git stash pop` |
+| <kbd>!</kbd><kbd>d</kbd> | `git stash drop` |
 
 </details>
 <details>
@@ -115,8 +128,8 @@ gitrs blame <file> [line]
 
 | Key | Action |
 |:---|:---|
-| <kbd>Enter</kbd> | Open files view |
-| <kbd>s</kbd> | Open show view |
+| <kbd>Enter</kbd> | Open Files view |
+| <kbd>s</kbd> | Open Show view |
 | <kbd>h</kbd> / <kbd>←</kbd> | Go to parent blame |
 | <kbd>l</kbd> / <kbd>→</kbd> | Return to previous blame |
 
@@ -140,9 +153,10 @@ An action can be a:
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
-    - Status specific: `stage_unstage_file`, `stage_unstage_files`
+    - Status specific: `status_switch_view`, `stage_unstage_file`, `stage_unstage_files`
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
-    - Log specific: `next_commit`, `previous_commit`
+    - Log specific: `pager_next_commit`, `pager_previous_commit`
+    - Stash specific: `stash_drop`, `stash_apply`, `stash_pop`
     - Others: `nop`, `reload`, `quit`, `open_files_app`, `open_show_app`
 
 ---

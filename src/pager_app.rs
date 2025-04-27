@@ -304,7 +304,7 @@ impl GitApp for PagerApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         match action {
-            Action::NextCommit => {
+            Action::PagerNextCommit => {
                 let mut idx = self.idx()? + 1;
                 loop {
                     let line = self

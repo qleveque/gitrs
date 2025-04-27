@@ -349,7 +349,7 @@ impl GitApp for StatusApp {
                     &mut self.staged_table,
                 );
             }
-            Action::SwitchView => {
+            Action::StatusSwitchView => {
                 let other_len = match self.staged_status {
                     StagedStatus::Staged => self.unstaged_table.len(),
                     StagedStatus::Unstaged => self.staged_table.len(),

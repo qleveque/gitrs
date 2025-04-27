@@ -1,7 +1,10 @@
-☐ handle name renaming in blame view
+☐ handle file renaming in blame view
 ☐ correct author name width glitch in blame view
 ☐ handle multiple commands with one key binding
 ☐ shorter author names
-☐ stash view
+☑ stash view
 ☐ branch view
 ☐ buttons
+☐ properly parse patches in stash pager (line + file)
+☐ format the git blame raw output for easier parsing
+

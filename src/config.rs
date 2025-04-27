@@ -23,6 +23,7 @@ pub enum MappingScope {
     Log,
     Show,
     Reflog,
+    Stash,
     Blame,
 }
 
@@ -42,6 +43,7 @@ impl FromStr for MappingScope {
             "log" => Ok(MappingScope::Log),
             "show" => Ok(MappingScope::Show),
             "reflog" => Ok(MappingScope::Reflog),
+            "stash" => Ok(MappingScope::Stash),
             "blame" => Ok(MappingScope::Blame),
             _ => return Err(Error::ParseMappingScopeError(s.to_string())),
         }
@@ -133,11 +135,30 @@ impl Default for Config {
                 ],
             ),
             (
+                MappingScope::Stash,
+                vec![
+                    ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("s".to_string(), Action::OpenShowApp),
+                    (
+                        "!a".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash apply".to_string()),
+                    ),
+                    (
+                        "!p".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash pop".to_string()),
+                    ),
+                    (
+                        "!d".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash drop".to_string()),
+                    ),
+                ],
+            ),
+            (
                 MappingScope::Pager,
                 vec![
                     ("<cr>".to_string(), Action::OpenFilesApp),
                     ("s".to_string(), Action::OpenShowApp),
-                    ("c".to_string(), Action::NextCommit),
+                    ("c".to_string(), Action::PagerNextCommit),
                     ("C".to_string(), Action::PreviousCommit),
                     (
                         "d".to_string(),
@@ -154,7 +175,7 @@ impl Default for Config {
                     ("t".to_string(), Action::StageUnstageFile),
                     ("<space>".to_string(), Action::StageUnstageFile),
                     ("T".to_string(), Action::StageUnstageFiles),
-                    ("<tab>".to_string(), Action::SwitchView),
+                    ("<tab>".to_string(), Action::StatusSwitchView),
                     ("K".to_string(), Action::FocusUnstagedView),
                     ("J".to_string(), Action::FocusStagedView),
                     (
