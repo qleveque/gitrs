@@ -6,9 +6,9 @@ mod config;
 mod errors;
 mod git;
 mod log_app;
-mod show_app;
+mod files_app;
 mod status_app;
-mod view_list;
+mod pager_widget;
 mod ui;
 
 use std::io::{self, stdout};
@@ -17,8 +17,8 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use log_app::LogApp;
-use show_app::ShowApp;
+use log_app::PagerApp;
+use files_app::FilesApp;
 use status_app::StatusApp;
 
 use app::GitApp;
@@ -53,8 +53,8 @@ enum Commands {
         line: usize,
     },
 
-    /// Show view
-    Show {
+    /// Files view
+    Files {
         /// Optional revision hash or reference
         revision: Option<String>,
     },
@@ -70,8 +70,8 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
     let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
-        Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
-        Commands::Log { args } => LogApp::new(args)?.run(terminal),
+        Commands::Files { revision } => FilesApp::new(revision)?.run(terminal),
+        Commands::Log { args } => PagerApp::new(args)?.run(terminal),
     };
     ret
 }

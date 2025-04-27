@@ -26,7 +26,7 @@ use crate::{
     action::{Action, CommandType},
     app_state::{AppState, InputState},
     errors::Error,
-    show_app::ShowApp,
+    files_app::FilesApp,
 };
 
 const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
@@ -488,11 +488,11 @@ pub trait GitApp {
             Action::PreviousSearchResult => self.search_result(true)?,
             Action::GoTo(line) => self.state().list_state.select(Some(*line)),
             Action::None => (),
-            Action::ShowCommit => {
+            Action::OpenFilesApp => {
                 let (_, rev, _) = self.get_file_rev_line()?;
                 if let Some(rev) = rev {
                     terminal.clear()?;
-                    ShowApp::new(Some(rev))?.run(terminal)?;
+                    FilesApp::new(Some(rev))?.run(terminal)?;
                     terminal.clear()?;
                 };
             }

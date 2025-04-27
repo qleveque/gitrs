@@ -20,7 +20,7 @@
 
 ## Features
 
-- Status, Log, Show, and Blame views
+- Status, Log, Files, and Blame views
 - Highly customizable key mappings
 - Built-in and shell action support
 - Asynchronous command execution
@@ -35,7 +35,7 @@ Each view reimagines a common Git workflow to make it faster, simpler, and more 
 ```bash
 gitrs status
 gitrs log [...params]
-gitrs show [revision]
+gitrs files [revision]
 gitrs blame <file> [line]
 ```
 
@@ -100,7 +100,7 @@ gitrs blame <file> [line]
 
 </details>
 <details>
-<summary><strong>Show</strong></summary>
+<summary><strong>Files</strong></summary>
 
 | Key | Action |
 |:---|:---|
@@ -136,7 +136,7 @@ An action can be a:
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
-    - Status specific: `stage_unstage_file`, `stage_unstage_files`, `show_commit`
+    - Status specific: `stage_unstage_file`, `stage_unstage_files`, `open_files_app`
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
     - Log specific: `next_commit`, `previous_commit`
     - Others: `nop`, `reload`, `quit`
@@ -152,7 +152,7 @@ Configure gitrs by creating a `~/.gitrsrc` file.
 ```bash
 map <scope> <keys> <action>
 ```
-* scope: `global` | `show` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `log` | `blame`
+* scope: `global` | `files` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `log` | `blame`
 * keys: a vim-like key binding sequence (e.g. `<c-x>E`)
 
 #### Setting Options

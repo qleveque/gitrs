@@ -13,7 +13,7 @@ use crate::{
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum MappingScope {
     Global,
-    Show,
+    Files,
     Status,
     StatusUnstaged,
     StatusStaged,
@@ -29,7 +29,7 @@ impl FromStr for MappingScope {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "global" => Ok(MappingScope::Global),
-            "show" => Ok(MappingScope::Show),
+            "show" => Ok(MappingScope::Files),
             "status" => Ok(MappingScope::Status),
             "unstaged" => Ok(MappingScope::StatusUnstaged),
             "staged" => Ok(MappingScope::StatusStaged),
@@ -106,7 +106,7 @@ impl Default for Config {
                 ],
             ),
             (
-                MappingScope::Show,
+                MappingScope::Files,
                 vec![(
                     "<cr>".to_string(),
                     Action::Command(
@@ -122,13 +122,13 @@ impl Default for Config {
                     ("<right>".to_string(), Action::NextCommitBlame),
                     ("h".to_string(), Action::PreviousCommitBlame),
                     ("<left>".to_string(), Action::PreviousCommitBlame),
-                    ("<cr>".to_string(), Action::ShowCommit),
+                    ("<cr>".to_string(), Action::OpenFilesApp),
                 ],
             ),
             (
                 MappingScope::Log,
                 vec![
-                    ("<cr>".to_string(), Action::ShowCommit),
+                    ("<cr>".to_string(), Action::OpenFilesApp),
                     ("c".to_string(), Action::NextCommit),
                     ("C".to_string(), Action::PreviousCommit),
                     (

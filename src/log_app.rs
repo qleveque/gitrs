@@ -9,7 +9,7 @@ use crate::app_state::{AppState, NotifChannel};
 use crate::config::MappingScope;
 use crate::errors::Error;
 use crate::git::{git_log_output, set_git_dir};
-use crate::view_list::ViewList;
+use crate::pager_widget::PagerWidget;
 
 use ratatui::layout::Rect;
 
@@ -17,8 +17,8 @@ use ratatui::widgets::Clear;
 use ratatui::Frame;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-struct LogAppViewModel {
-    list: ViewList,
+struct PagerAppViewModel {
+    list: PagerWidget,
     height: usize,
 }
 
@@ -30,16 +30,16 @@ pub enum LogStyle {
     OneLineGraph,
 }
 
-pub struct LogApp {
+pub struct PagerApp {
     state: AppState,
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
     loaded: Arc<AtomicBool>,
     original_dir: std::path::PathBuf,
-    view_model: LogAppViewModel,
+    view_model: PagerAppViewModel,
 }
 
-impl LogApp {
+impl PagerApp {
     pub fn new(args: Vec<String>) -> Result<Self, Error> {
         let state = AppState::new()?;
         let original_dir = env::current_dir()?;
@@ -109,8 +109,8 @@ impl LogApp {
             log_style,
             loaded,
             original_dir,
-            view_model: LogAppViewModel {
-                list: ViewList::default(),
+            view_model: PagerAppViewModel {
+                list: PagerWidget::default(),
                 height: 0,
             },
         };
@@ -199,7 +199,7 @@ impl LogApp {
     }
 }
 
-impl GitApp for LogApp {
+impl GitApp for PagerApp {
     fn state(&mut self) -> &mut AppState {
         &mut self.state
     }
@@ -230,7 +230,7 @@ impl GitApp for LogApp {
         } else {
             self.state.notif.remove(&NotifChannel::Loading);
         }
-        self.view_model.list = ViewList::new(
+        self.view_model.list = PagerWidget::new(
             &self.lines.lock().unwrap(),
             self.view_model.height,
             &mut self.state,
