@@ -4,7 +4,7 @@ use crate::app_state::AppState;
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
+use crate::git::{git_parse_commit, git_files_output, set_git_dir, Commit, FileStatus};
 
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -41,7 +41,7 @@ impl FilesApp {
         let original_dir = env::current_dir()?;
         set_git_dir(&state.config);
 
-        let output = git_show_output(&revision, &state.config)?;
+        let output = git_files_output(&revision, &state.config)?;
         let mut commit = git_parse_commit(&output)?;
         commit
             .files

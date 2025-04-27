@@ -19,7 +19,9 @@ pub enum MappingScope {
     StatusStaged,
     StatusUnmerged,
     StatusUntracked,
+    Pager,
     Log,
+    Show,
     Blame,
 }
 
@@ -29,13 +31,15 @@ impl FromStr for MappingScope {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "global" => Ok(MappingScope::Global),
-            "show" => Ok(MappingScope::Files),
+            "files" => Ok(MappingScope::Files),
             "status" => Ok(MappingScope::Status),
             "unstaged" => Ok(MappingScope::StatusUnstaged),
             "staged" => Ok(MappingScope::StatusStaged),
             "unmerged" => Ok(MappingScope::StatusUnmerged),
             "untracked" => Ok(MappingScope::StatusUntracked),
+            "pager" => Ok(MappingScope::Pager),
             "log" => Ok(MappingScope::Log),
+            "show" => Ok(MappingScope::Show),
             "blame" => Ok(MappingScope::Blame),
             _ => return Err(Error::ParseMappingScopeError(s.to_string())),
         }
@@ -118,17 +122,19 @@ impl Default for Config {
             (
                 MappingScope::Blame,
                 vec![
+                    ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("s".to_string(), Action::OpenShowApp),
                     ("l".to_string(), Action::NextCommitBlame),
                     ("<right>".to_string(), Action::NextCommitBlame),
                     ("h".to_string(), Action::PreviousCommitBlame),
                     ("<left>".to_string(), Action::PreviousCommitBlame),
-                    ("<cr>".to_string(), Action::OpenFilesApp),
                 ],
             ),
             (
-                MappingScope::Log,
+                MappingScope::Pager,
                 vec![
                     ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("s".to_string(), Action::OpenShowApp),
                     ("c".to_string(), Action::NextCommit),
                     ("C".to_string(), Action::PreviousCommit),
                     (

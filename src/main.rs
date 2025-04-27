@@ -17,7 +17,7 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use log_app::PagerApp;
+use log_app::{PagerApp, PagerCommand};
 use files_app::FilesApp;
 use status_app::StatusApp;
 
@@ -64,6 +64,12 @@ enum Commands {
         /// Arguments passed to git log
         args: Vec<String>
     },
+    /// Show view
+    #[command(allow_hyphen_values = true)]
+    Show {
+        /// Arguments passed to git log
+        args: Vec<String>
+    },
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {
@@ -71,7 +77,8 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Files { revision } => FilesApp::new(revision)?.run(terminal),
-        Commands::Log { args } => PagerApp::new(args)?.run(terminal),
+        Commands::Log { args } => PagerApp::new(PagerCommand::Log, args)?.run(terminal),
+        Commands::Show { args } => PagerApp::new(PagerCommand::Show, args)?.run(terminal),
     };
     ret
 }

@@ -199,7 +199,7 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
     Ok(commit)
 }
 
-pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
+pub fn git_files_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
     let mut args: Vec<String> = vec![
         "show".to_string(),
         "--decorate".to_string(),
@@ -215,14 +215,14 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<Str
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-pub fn git_log_output(
+pub fn git_pager_output(
+    command: &str,
     git_exe: String,
     user_args: Vec<String>,
 ) -> Result<Lines<BufReader<ChildStdout>>, Error> {
-    let mut args: Vec<String> = vec!["log".to_string(), "--color=always".to_string()];
+    let mut args: Vec<String> = vec![command.to_string(), "--color=always".to_string()];
     args.extend(user_args);
 
-    // Start the git log process
     let command = Command::new(git_exe)
         .args(args)
         .stdout(Stdio::piped())

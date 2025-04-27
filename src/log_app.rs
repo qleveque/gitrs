@@ -8,7 +8,7 @@ use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_log_output, set_git_dir};
+use crate::git::{git_pager_output, set_git_dir};
 use crate::pager_widget::PagerWidget;
 
 use ratatui::layout::Rect;
@@ -30,7 +30,13 @@ pub enum LogStyle {
     OneLineGraph,
 }
 
+pub enum PagerCommand {
+    Log,
+    Show,
+}
+
 pub struct PagerApp {
+    pager_command: PagerCommand,
     state: AppState,
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
@@ -40,12 +46,17 @@ pub struct PagerApp {
 }
 
 impl PagerApp {
-    pub fn new(args: Vec<String>) -> Result<Self, Error> {
+    pub fn new(pager_command: PagerCommand, args: Vec<String>) -> Result<Self, Error> {
         let state = AppState::new()?;
         let original_dir = env::current_dir()?;
         set_git_dir(&state.config);
         let git_exe = state.config.git_exe.clone();
-        let mut iterator = git_log_output(git_exe, args).unwrap();
+        let git_command = match pager_command {
+            PagerCommand::Log => "log",
+            PagerCommand::Show => "show",
+        };
+        let mut iterator = git_pager_output(git_command, git_exe, args)?;
+
         let first_line_ansi = iterator
             .by_ref()
             .next()
@@ -104,6 +115,7 @@ impl PagerApp {
         });
 
         let mut r = Self {
+            pager_command,
             state,
             lines,
             log_style,
@@ -242,7 +254,16 @@ impl GitApp for PagerApp {
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
-        vec![(MappingScope::Log, true)]
+        match self.pager_command {
+            PagerCommand::Log => vec![
+                (MappingScope::Pager, true),
+                (MappingScope::Log, true),
+            ],
+            PagerCommand::Show => vec![
+                (MappingScope::Pager, true),
+                (MappingScope::Show, true),
+            ]
+        }
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {

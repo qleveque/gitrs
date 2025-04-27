@@ -35,6 +35,7 @@ Each view reimagines a common Git workflow to make it faster, simpler, and more 
 ```bash
 gitrs status
 gitrs log [...params]
+gitrs show [...params]
 gitrs files [revision]
 gitrs blame <file> [line]
 ```
@@ -89,11 +90,12 @@ gitrs blame <file> [line]
 
 </details>
 <details>
-<summary><strong>Log</strong></summary>
+<summary><strong>Log, Show</strong></summary>
 
 | Key | Action |
 |:---|:---|
-| <kbd>Enter</kbd> | Show commit details |
+| <kbd>Enter</kbd> | Open files view |
+| <kbd>s</kbd> | Open show view |
 | <kbd>c</kbd> | Next commit |
 | <kbd>C</kbd> | Previous commit |
 | <kbd>d</kbd> | Open current patch with `git difftool` |
@@ -112,7 +114,8 @@ gitrs blame <file> [line]
 
 | Key | Action |
 |:---|:---|
-| <kbd>Enter</kbd> | Show commit details |
+| <kbd>Enter</kbd> | Open files view |
+| <kbd>s</kbd> | Open show view |
 | <kbd>h</kbd> / <kbd>←</kbd> | Go to parent blame |
 | <kbd>l</kbd> / <kbd>→</kbd> | Return to previous blame |
 
@@ -136,10 +139,10 @@ An action can be a:
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
-    - Status specific: `stage_unstage_file`, `stage_unstage_files`, `open_files_app`
+    - Status specific: `stage_unstage_file`, `stage_unstage_files`
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
     - Log specific: `next_commit`, `previous_commit`
-    - Others: `nop`, `reload`, `quit`
+    - Others: `nop`, `reload`, `quit`, `open_files_app`, `open_show_app`
 
 ---
 
@@ -152,7 +155,7 @@ Configure gitrs by creating a `~/.gitrsrc` file.
 ```bash
 map <scope> <keys> <action>
 ```
-* scope: `global` | `files` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `log` | `blame`
+* scope: `global` | `files` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `pager` | `show` | `log` | `blame`
 * keys: a vim-like key binding sequence (e.g. `<c-x>E`)
 
 #### Setting Options
