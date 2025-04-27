@@ -1,0 +1,7 @@
+☐ handle name renaming in blame view
+☐ correct author name width glitch in blame view
+☐ handle multiple commands with one key binding
+☐ shorter author names
+☐ stash view
+☐ branch view
+☐ buttons
