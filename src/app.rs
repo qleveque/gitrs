@@ -5,7 +5,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{app_state::NotifChannel, config::MappingScope, log_app::{PagerApp, PagerCommand}};
+use crate::{app_state::NotifChannel, config::MappingScope, pager_app::{PagerApp, PagerCommand}};
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{

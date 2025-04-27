@@ -58,6 +58,11 @@ pub struct CommitRef {
     pub date: String,
 }
 
+pub struct Stash {
+    pub date: String,
+    pub title: String,
+}
+
 impl CommitRef {
     pub fn new(hash: String, author: String, date: String) -> Self {
         CommitRef { hash, author, date }
@@ -197,6 +202,18 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
         commit_hash.to_string()
     );
     Ok(commit)
+}
+
+pub fn git_stash_output(config: &Config) -> Result<String, Error> {
+    let args: Vec<String> = vec![
+        "stash".to_string(),
+        "list".to_string(),
+        "--format=%cd\t%s".to_string(),
+        "--date=iso-local".to_string(),
+    ];
+    let output = Command::new(config.git_exe.clone()).args(args).output()?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 pub fn git_files_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {

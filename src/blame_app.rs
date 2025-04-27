@@ -5,9 +5,8 @@ use crate::config::{Config, MappingScope};
 
 use crate::errors::Error;
 use crate::git::{git_blame_output, CommitRef};
-use crate::ui::{age_to_color, highlight_style};
+use crate::ui::{date_to_color, highlight_style};
 
-use chrono::{NaiveDate, Utc};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
@@ -124,12 +123,7 @@ impl<'a> BlameApp {
     ) -> Line<'a> {
         match opt_commit {
             Some(commit) => {
-                let today = Utc::now().date_naive();
-                let past_date = NaiveDate::parse_from_str(
-                    &commit.date,
-                    "%Y-%m-%d",
-                ).unwrap_or(today.clone());
-                let age_color = age_to_color((today - past_date).num_days() as f32 / (365.0 * 2.0));
+                let date_color = date_to_color(&commit.date);
                 let displayed_hash: String = commit.hash.chars().take(4).collect();
                 let spans = vec![
                     Span::styled(displayed_hash, Style::from(Color::Blue)),
@@ -139,7 +133,7 @@ impl<'a> BlameApp {
                         Style::from(Color::Gray),
                     ),
                     Span::raw(" "),
-                    Span::styled(commit.date.clone(), Style::from(age_color)),
+                    Span::styled(commit.date.clone(), Style::from(date_color)),
                     Span::raw(" "),
                     Span::styled(
                         format!("{:>max_line_len$}", idx + 1),

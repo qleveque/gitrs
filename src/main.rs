@@ -5,7 +5,8 @@ mod blame_app;
 mod config;
 mod errors;
 mod git;
-mod log_app;
+mod pager_app;
+mod stash_app;
 mod files_app;
 mod status_app;
 mod pager_widget;
@@ -17,9 +18,10 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use log_app::{PagerApp, PagerCommand};
+use pager_app::{PagerApp, PagerCommand};
 use files_app::FilesApp;
 use status_app::StatusApp;
+use stash_app::StashApp;
 
 use app::GitApp;
 
@@ -76,6 +78,8 @@ enum Commands {
         /// Arguments passed to git reflog
         args: Vec<String>
     },
+    /// Stash view
+    Stash,
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {
@@ -86,6 +90,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Log { args } => PagerApp::new(PagerCommand::Log, args)?.run(terminal),
         Commands::Show { args } => PagerApp::new(PagerCommand::Show, args)?.run(terminal),
         Commands::Reflog { args } => PagerApp::new(PagerCommand::Reflog, args)?.run(terminal),
+        Commands::Stash => StashApp::new()?.run(terminal),
     };
     ret
 }
