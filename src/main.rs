@@ -67,7 +67,13 @@ enum Commands {
     /// Show view
     #[command(allow_hyphen_values = true)]
     Show {
-        /// Arguments passed to git log
+        /// Arguments passed to git show
+        args: Vec<String>
+    },
+    /// Reflog view
+    #[command(allow_hyphen_values = true)]
+    Reflog {
+        /// Arguments passed to git reflog
         args: Vec<String>
     },
 }
@@ -79,6 +85,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Files { revision } => FilesApp::new(revision)?.run(terminal),
         Commands::Log { args } => PagerApp::new(PagerCommand::Log, args)?.run(terminal),
         Commands::Show { args } => PagerApp::new(PagerCommand::Show, args)?.run(terminal),
+        Commands::Reflog { args } => PagerApp::new(PagerCommand::Reflog, args)?.run(terminal),
     };
     ret
 }

@@ -22,6 +22,7 @@ pub enum MappingScope {
     Pager,
     Log,
     Show,
+    Reflog,
     Blame,
 }
 
@@ -40,6 +41,7 @@ impl FromStr for MappingScope {
             "pager" => Ok(MappingScope::Pager),
             "log" => Ok(MappingScope::Log),
             "show" => Ok(MappingScope::Show),
+            "reflog" => Ok(MappingScope::Reflog),
             "blame" => Ok(MappingScope::Blame),
             _ => return Err(Error::ParseMappingScopeError(s.to_string())),
         }
@@ -90,21 +92,21 @@ impl Default for Config {
                         "yc".to_string(),
                         Action::Command(
                             CommandType::Async,
-                            "echo %(rev) | %(clip)".to_string(),
+                            "echo '%(rev)' | %(clip)".to_string(),
                         ),
                     ),
                     (
                         "yf".to_string(),
                         Action::Command(
                             CommandType::Async,
-                            "echo %(file) | %(clip)".to_string(),
+                            "echo '%(file)' | %(clip)".to_string(),
                         ),
                     ),
                     (
                         "yy".to_string(),
                         Action::Command(
                             CommandType::Async,
-                            "echo %(text) | %(clip)".to_string(),
+                            "echo '%(text)' | %(clip)".to_string(),
                         ),
                     ),
                 ],

@@ -20,7 +20,7 @@
 
 ## Features
 
-- Status, Log, Files, and Blame views
+- Status, Log, Show, Reflog, Files, and Blame views
 - Highly customizable key mappings
 - Built-in and shell action support
 - Asynchronous command execution
@@ -36,6 +36,7 @@ Each view reimagines a common Git workflow to make it faster, simpler, and more 
 gitrs status
 gitrs log [...params]
 gitrs show [...params]
+gitrs reflog [...params]
 gitrs files [revision]
 gitrs blame <file> [line]
 ```
@@ -90,7 +91,7 @@ gitrs blame <file> [line]
 
 </details>
 <details>
-<summary><strong>Log, Show</strong></summary>
+<summary><strong>Log, Show, Reflog </strong></summary>
 
 | Key | Action |
 |:---|:---|
@@ -155,7 +156,7 @@ Configure gitrs by creating a `~/.gitrsrc` file.
 ```bash
 map <scope> <keys> <action>
 ```
-* scope: `global` | `files` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `pager` | `show` | `log` | `blame`
+* scope: `global` | `files` | `status` | `unstaged` | `staged` | `unmerged` | `untracked` | `pager` | `show` | `log` | `reflog` | `blame`
 * keys: a vim-like key binding sequence (e.g. `<c-x>E`)
 
 #### Setting Options

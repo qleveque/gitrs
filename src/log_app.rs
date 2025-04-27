@@ -33,6 +33,7 @@ pub enum LogStyle {
 pub enum PagerCommand {
     Log,
     Show,
+    Reflog
 }
 
 pub struct PagerApp {
@@ -54,6 +55,7 @@ impl PagerApp {
         let git_command = match pager_command {
             PagerCommand::Log => "log",
             PagerCommand::Show => "show",
+            PagerCommand::Reflog => "reflog",
         };
         let mut iterator = git_pager_output(git_command, git_exe, args)?;
 
@@ -262,6 +264,10 @@ impl GitApp for PagerApp {
             PagerCommand::Show => vec![
                 (MappingScope::Pager, true),
                 (MappingScope::Show, true),
+            ],
+            PagerCommand::Reflog => vec![
+                (MappingScope::Pager, true),
+                (MappingScope::Reflog, true),
             ]
         }
     }
