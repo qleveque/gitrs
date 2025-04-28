@@ -7,10 +7,10 @@ use crate::{
     errors::Error,
 };
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum NotifChannel {
     Search,
-    Loading,
+    Line,
     Keys,
     Error,
 }

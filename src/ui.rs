@@ -11,6 +11,11 @@ pub fn search_highlight_style() -> Style {
         .add_modifier(Modifier::REVERSED)
 }
 
+pub fn notif_style() -> Style {
+    Style::default().bg(Color::Rgb(25, 25, 25))
+}
+
+
 pub fn date_to_color(date: &str) -> Color {
     let today = Utc::now().date_naive();
     let past_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap_or(today.clone());

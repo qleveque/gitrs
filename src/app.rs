@@ -9,7 +9,7 @@ use crate::{
     app_state::NotifChannel,
     config::MappingScope,
     pager_app::{PagerApp, PagerCommand},
-    ui::search_highlight_style,
+    ui::{notif_style, search_highlight_style},
 };
 use regex::{Regex, RegexBuilder};
 
@@ -23,7 +23,7 @@ use ratatui::{
     prelude::CrosstermBackend,
     style::{Color, Style},
     text::{Line, Text},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Clear, Paragraph, Widget},
     Frame, Terminal,
 };
 
@@ -70,6 +70,10 @@ pub trait GitApp {
         self.state().notif.insert(notif_channel, message);
     }
 
+    fn clear_notif(&mut self, notif_channel: NotifChannel) {
+        self.state().notif.remove(&notif_channel);
+    }
+
     fn search_regex(&self) -> Result<Regex, Error> {
         let search_string = self.get_state().search_string.clone();
         let is_case_sensitive = match self.get_state().config.smart_case {
@@ -111,7 +115,7 @@ pub trait GitApp {
 
     fn stop_continued_search(&mut self) {
         self.state().current_search_idx = None;
-        self.state().notif.remove(&NotifChannel::Search);
+        self.clear_notif(NotifChannel::Search);
     }
 
     fn search_result(&mut self, mut reversed: bool) -> Result<(), Error> {
@@ -158,15 +162,10 @@ pub trait GitApp {
             false => format!("/{}│", self.state().search_string),
             true => format!("?{}│", self.state().search_string),
         };
-        let title = match self.state().search_reverse {
-            false => "Search",
-            true => "Search (rev)",
-        };
-        let paragraph = Paragraph::new(search_string)
-            .block(Block::default().borders(Borders::TOP).title(title));
+        let paragraph = Paragraph::new(search_string);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(2)])
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
             .split(*chunk);
         frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
@@ -212,11 +211,10 @@ pub trait GitApp {
 
     fn display_cmd_line(&mut self, chunk: &mut Rect, frame: &mut Frame) {
         let command_string = format!(":{}│", self.state().command_string);
-        let paragraph = Paragraph::new(command_string)
-            .block(Block::default().borders(Borders::TOP).title("Command"));
+        let paragraph = Paragraph::new(command_string);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(2)])
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
             .split(*chunk);
         frame.render_widget(Clear, chunks[1]);
         Widget::render(&paragraph, chunks[1], frame.buffer_mut());
@@ -224,10 +222,12 @@ pub trait GitApp {
     }
 
     fn display_notifications(&mut self, chunk: &mut Rect, frame: &mut Frame, loading_char: char) {
-        let lines: Vec<Line> = self
-            .state()
-            .notif
-            .iter()
+        let loaded = self.loaded();
+
+        let mut notif_vec: Vec<_> = self.state().notif.iter().collect();
+        notif_vec.sort_by_key(|(notif_channel, _)| *notif_channel);
+
+        let lines: Vec<Line> = notif_vec.into_iter()
             .map(|(notif_channel, message)| {
                 let line_style = match notif_channel {
                     NotifChannel::Error => Style::from(Color::Red),
@@ -235,8 +235,12 @@ pub trait GitApp {
                 };
                 let mut message = message.clone();
                 match notif_channel {
-                    NotifChannel::Search | NotifChannel::Loading => {
+                    NotifChannel::Search => {
                         message.push(' ');
+                        message.push(loading_char);
+                    },
+                    NotifChannel::Line if !loaded => {
+                        message.push_str("... ");
                         message.push(loading_char);
                     }
                     _ => (),
@@ -245,9 +249,9 @@ pub trait GitApp {
             })
             .collect();
         let paragraph = Paragraph::new(Text::from(lines))
-            .block(Block::default().borders(Borders::TOP).title("Notifs"));
+            .style(notif_style());
 
-        let len = self.state().notif.len() as u16 + 1;
+        let len = self.state().notif.len() as u16;
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(0), Constraint::Length(len)])
@@ -308,7 +312,7 @@ pub trait GitApp {
             // display key combination if multiple letters
             let key_combination = self.state().key_combination.clone();
             if self.state().notif.is_empty() && !key_combination.is_empty() {
-                let message = format!("Keys: {}", key_combination);
+                let message = format!("keys: {}", key_combination);
                 self.notif(NotifChannel::Keys, message);
             }
         }

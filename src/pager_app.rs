@@ -266,12 +266,10 @@ impl GitApp for PagerApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        if !self.loaded() {
-            let message = format!("loading lines {}...", self.lines.lock().unwrap().len());
-            self.notif(NotifChannel::Loading, message);
-        } else {
-            self.state.notif.remove(&NotifChannel::Loading);
-        }
+        let idx = self.idx().unwrap_or(0);
+        let idx = idx.checked_add(1).unwrap_or(0);
+        let message = format!("line {} of {}", idx, self.lines.lock().unwrap().len());
+        self.notif(NotifChannel::Line, message);
         self.view_model.list = PagerWidget::new(
             &self.lines.lock().unwrap(),
             self.view_model.height,
