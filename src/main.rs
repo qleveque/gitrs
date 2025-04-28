@@ -96,26 +96,38 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
     ret
 }
 
-fn main() -> io::Result<()> {
+fn prepare_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>, io::Error> {
     let backend = CrosstermBackend::new(stdout());
-    let mut terminal = Terminal::new(backend)?;
+    let terminal = Terminal::new(backend)?;
     enable_raw_mode()?;
-
     execute!(stdout(), EnterAlternateScreen)?;
+    Ok(terminal)
+}
 
-    let ret = if atty::is(Stream::Stdin) {
-        app(&mut terminal, Cli::parse())
-    } else {
-        // use the application as a pager
-        match PagerApp::new(None) {
-            Ok(mut pager_app) => pager_app.run(&mut terminal),
-            Err(e) => Err(e),
-        }
-    };
-
+fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) -> Result<(), io::Error> {
     disable_raw_mode()?;
     terminal.show_cursor()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    Ok(())
+}
+
+fn main() -> io::Result<()> {
+    let ret = if atty::is(Stream::Stdin) {
+        let cli = Cli::parse();
+        let mut terminal = prepare_terminal()?;
+        let ret = app(&mut terminal, cli);
+        restore_terminal(&mut terminal)?;
+        ret
+    } else {
+        // use the application as a pager
+        let mut terminal = prepare_terminal()?;
+        let ret = match PagerApp::new(None) {
+            Ok(mut pager_app) => pager_app.run(&mut terminal),
+            Err(e) => Err(e),
+        };
+        restore_terminal(&mut terminal)?;
+        ret
+    };
 
     if let Err(err) = ret {
         eprintln!("{} {}", "error:".red().bold(), err.to_string().white());
