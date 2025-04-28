@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     env,
-    io::{BufRead, BufReader, Lines},
+    io::{BufRead, BufReader},
     process::{exit, ChildStdout, Command, Stdio},
 };
 
@@ -160,7 +160,10 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
 
     // Parse commit hash
     let line = lines.next().ok_or_else(|| Error::GitParsingError)?;
-    let commit_hash = line.split_whitespace().nth(1).ok_or_else(|| Error::GitParsingError)?;
+    let commit_hash = line
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| Error::GitParsingError)?;
     metadata.push(line.clone());
 
     // Read all metadata
@@ -191,16 +194,16 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
                 Some('D') => FileStatus::Deleted,
                 _ => break,
             };
-            let filename = line.split('\t').nth(1).ok_or_else(|| Error::GitParsingError)?.to_string();
+            let filename = line
+                .split('\t')
+                .nth(1)
+                .ok_or_else(|| Error::GitParsingError)?
+                .to_string();
             files.push((status, filename));
         }
     }
 
-    let commit = Commit::new(
-        metadata.join("\n"),
-        files,
-        commit_hash.to_string()
-    );
+    let commit = Commit::new(metadata.join("\n"), files, commit_hash.to_string());
     Ok(commit)
 }
 
@@ -236,7 +239,7 @@ pub fn git_pager_output(
     command: &str,
     git_exe: String,
     user_args: Vec<String>,
-) -> Result<Lines<BufReader<ChildStdout>>, Error> {
+) -> Result<BufReader<ChildStdout>, Error> {
     let mut args: Vec<String> = vec![command.to_string(), "--color=always".to_string()];
     args.extend(user_args);
 
@@ -247,7 +250,7 @@ pub fn git_pager_output(
 
     let stdout = command.stdout.ok_or_else(|| Error::GitParsingError)?;
 
-    Ok(BufReader::new(stdout).lines())
+    Ok(BufReader::new(stdout))
 }
 
 #[cfg(target_os = "linux")]

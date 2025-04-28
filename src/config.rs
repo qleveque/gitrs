@@ -92,24 +92,15 @@ impl Default for Config {
                     ("N".to_string(), Action::PreviousSearchResult),
                     (
                         "yc".to_string(),
-                        Action::Command(
-                            CommandType::Async,
-                            "echo '%(rev)' | %(clip)".to_string(),
-                        ),
+                        Action::Command(CommandType::Async, "echo '%(rev)' | %(clip)".to_string()),
                     ),
                     (
                         "yf".to_string(),
-                        Action::Command(
-                            CommandType::Async,
-                            "echo '%(file)' | %(clip)".to_string(),
-                        ),
+                        Action::Command(CommandType::Async, "echo '%(file)' | %(clip)".to_string()),
                     ),
                     (
                         "yy".to_string(),
-                        Action::Command(
-                            CommandType::Async,
-                            "echo '%(text)' | %(clip)".to_string(),
-                        ),
+                        Action::Command(CommandType::Async, "echo '%(text)' | %(clip)".to_string()),
                     ),
                 ],
             ),
@@ -240,11 +231,7 @@ impl Default for Config {
         .into_iter()
         .collect();
 
-        let clipboard_tool = if cfg!(windows) {
-            "clip.exe"
-        } else {
-            "xsel"
-        }.to_string();
+        let clipboard_tool = if cfg!(windows) { "clip.exe" } else { "xsel" }.to_string();
 
         Config {
             scroll_off: 2,

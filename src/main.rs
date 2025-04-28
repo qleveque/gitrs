@@ -4,24 +4,25 @@ mod app_state;
 mod blame_app;
 mod config;
 mod errors;
+mod files_app;
 mod git;
 mod pager_app;
-mod stash_app;
-mod files_app;
-mod status_app;
 mod pager_widget;
+mod stash_app;
+mod status_app;
 mod ui;
 
 use std::io::{self, stdout};
 
+use atty::Stream;
 use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use pager_app::{PagerApp, PagerCommand};
 use files_app::FilesApp;
-use status_app::StatusApp;
+use pager_app::{PagerApp, PagerCommand};
 use stash_app::StashApp;
+use status_app::StatusApp;
 
 use app::GitApp;
 
@@ -64,19 +65,19 @@ enum Commands {
     #[command(allow_hyphen_values = true)]
     Log {
         /// Arguments passed to git log
-        args: Vec<String>
+        args: Vec<String>,
     },
     /// Show view
     #[command(allow_hyphen_values = true)]
     Show {
         /// Arguments passed to git show
-        args: Vec<String>
+        args: Vec<String>,
     },
     /// Reflog view
     #[command(allow_hyphen_values = true)]
     Reflog {
         /// Arguments passed to git reflog
-        args: Vec<String>
+        args: Vec<String>,
     },
     /// Stash view
     Stash,
@@ -87,23 +88,30 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Files { revision } => FilesApp::new(revision)?.run(terminal),
-        Commands::Log { args } => PagerApp::new(PagerCommand::Log, args)?.run(terminal),
-        Commands::Show { args } => PagerApp::new(PagerCommand::Show, args)?.run(terminal),
-        Commands::Reflog { args } => PagerApp::new(PagerCommand::Reflog, args)?.run(terminal),
+        Commands::Log { args } => PagerApp::new(Some(PagerCommand::Log(args)))?.run(terminal),
+        Commands::Show { args } => PagerApp::new(Some(PagerCommand::Show(args)))?.run(terminal),
+        Commands::Reflog { args } => PagerApp::new(Some(PagerCommand::Reflog(args)))?.run(terminal),
         Commands::Stash => StashApp::new()?.run(terminal),
     };
     ret
 }
 
 fn main() -> io::Result<()> {
-    let cli = Cli::parse();
     let backend = CrosstermBackend::new(stdout());
     let mut terminal = Terminal::new(backend)?;
-
-    execute!(stdout(), EnterAlternateScreen)?;
     enable_raw_mode()?;
 
-    let ret = app(&mut terminal, cli);
+    execute!(stdout(), EnterAlternateScreen)?;
+
+    let ret = if atty::is(Stream::Stdin) {
+        app(&mut terminal, Cli::parse())
+    } else {
+        // use the application as a pager
+        match PagerApp::new(None) {
+            Ok(mut pager_app) => pager_app.run(&mut terminal),
+            Err(e) => Err(e),
+        }
+    };
 
     disable_raw_mode()?;
     terminal.show_cursor()?;

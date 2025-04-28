@@ -1,6 +1,8 @@
+use std::io::{BufRead, BufReader, Lines};
+use std::process::ChildStdout;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::{env, thread};
+use std::{env, io, thread};
 
 use crate::action::Action;
 use crate::app::GitApp;
@@ -31,14 +33,14 @@ pub enum LogStyle {
 }
 
 pub enum PagerCommand {
-    Log,
-    Show,
-    Reflog
+    Log(Vec<String>),
+    Show(Vec<String>),
+    Reflog(Vec<String>),
 }
 
 pub struct PagerApp {
-    pager_command: PagerCommand,
     state: AppState,
+    mapping_scopes: Vec<(MappingScope, bool)>,
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
     loaded: Arc<AtomicBool>,
@@ -46,24 +48,43 @@ pub struct PagerApp {
     view_model: PagerAppViewModel,
 }
 
+pub enum Input {
+    Command(Lines<BufReader<ChildStdout>>),
+    Stdin,
+}
+
 impl PagerApp {
-    pub fn new(pager_command: PagerCommand, args: Vec<String>) -> Result<Self, Error> {
+    pub fn new(pager_command: Option<PagerCommand>) -> Result<Self, Error> {
         let state = AppState::new()?;
         let original_dir = env::current_dir()?;
         set_git_dir(&state.config);
         let git_exe = state.config.git_exe.clone();
-        let git_command = match pager_command {
-            PagerCommand::Log => "log",
-            PagerCommand::Show => "show",
-            PagerCommand::Reflog => "reflog",
+        let mut mapping_scopes = vec![(MappingScope::Pager, true)];
+        let mut iterator = match pager_command {
+            Some(pager_command) => {
+                let (git_command, args, scope) = match pager_command {
+                    PagerCommand::Log(args) => ("log", args, MappingScope::Log),
+                    PagerCommand::Show(args) => ("show", args, MappingScope::Show),
+                    PagerCommand::Reflog(args) => ("reflog", args, MappingScope::Reflog),
+                };
+                mapping_scopes.push((scope, true));
+                let bufreader: BufReader<ChildStdout> =
+                    git_pager_output(git_command, git_exe, args)?;
+                Input::Command(bufreader.lines())
+            }
+            None => Input::Stdin,
         };
-        let mut iterator = git_pager_output(git_command, git_exe, args)?;
-
-        let first_line_ansi = iterator
-            .by_ref()
-            .next()
-            .ok_or_else(|| Error::GitParsingError)??
-            .replace("\t", "    ");
+        let first_line_ansi = match iterator {
+            Input::Command(ref mut lines) => lines.by_ref().next(),
+            Input::Stdin => {
+                let stdin = io::stdin();
+                let handle = stdin.lock();
+                let mut lines = handle.lines();
+                lines.next()
+            }
+        }
+        .ok_or_else(|| Error::GitParsingError)??
+        .replace("\t", "    ");
 
         let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
         let first_line = String::from_utf8(bytes)?;
@@ -94,10 +115,17 @@ impl PagerApp {
 
         thread::spawn(move || {
             let n = 100;
+            let mut stdin_lines = match iterator {
+                Input::Stdin => Some(io::stdin().lock().lines()),
+                Input::Command(_) => None,
+            };
             loop {
                 let mut chunk = Vec::with_capacity(n);
                 for _ in 0..n {
-                    let next = iterator.by_ref().next();
+                    let next = match iterator {
+                        Input::Command(ref mut lines) => lines.by_ref().next(),
+                        Input::Stdin => stdin_lines.as_mut().unwrap().next(),
+                    };
                     match next {
                         Some(res_line) => {
                             chunk.push(match res_line {
@@ -117,8 +145,8 @@ impl PagerApp {
         });
 
         let mut r = Self {
-            pager_command,
             state,
+            mapping_scopes,
             lines,
             log_style,
             loaded,
@@ -256,20 +284,7 @@ impl GitApp for PagerApp {
     }
 
     fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
-        match self.pager_command {
-            PagerCommand::Log => vec![
-                (MappingScope::Pager, true),
-                (MappingScope::Log, true),
-            ],
-            PagerCommand::Show => vec![
-                (MappingScope::Pager, true),
-                (MappingScope::Show, true),
-            ],
-            PagerCommand::Reflog => vec![
-                (MappingScope::Pager, true),
-                (MappingScope::Reflog, true),
-            ]
-        }
+        self.mapping_scopes.clone()
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {

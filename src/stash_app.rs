@@ -69,7 +69,7 @@ impl GitApp for StashApp {
                 };
                 Ok(stash)
             })
-            .collect::<Result<Vec<Stash>, Error>>()?; 
+            .collect::<Result<Vec<Stash>, Error>>()?;
 
         let list_items: Vec<Line> = self
             .stashes

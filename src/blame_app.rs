@@ -229,12 +229,8 @@ impl GitApp for BlameApp {
             .iter()
             .enumerate()
             .map(|(idx, opt_commit)| {
-                let display = BlameApp::displayed_blame_line(
-                    opt_commit,
-                    idx,
-                    max_author_len,
-                    max_line_len,
-                );
+                let display =
+                    BlameApp::displayed_blame_line(opt_commit, idx, max_author_len, max_line_len);
                 max_blame_len = max_blame_len.max(display.width());
                 ListItem::new(display)
             })

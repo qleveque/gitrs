@@ -4,7 +4,7 @@ use crate::app_state::AppState;
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_parse_commit, git_files_output, set_git_dir, Commit, FileStatus};
+use crate::git::{git_files_output, git_parse_commit, set_git_dir, Commit, FileStatus};
 
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};

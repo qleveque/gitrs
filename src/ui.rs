@@ -1,9 +1,8 @@
 use chrono::{NaiveDate, Utc};
 use ratatui::style::{Color, Modifier, Style};
 
-
 pub fn highlight_style() -> Style {
-     Style::from(Color::Rgb(255, 255, 255)).bg(Color::DarkGray)
+    Style::from(Color::Rgb(255, 255, 255)).bg(Color::DarkGray)
 }
 
 pub fn search_highlight_style() -> Style {
@@ -14,10 +13,7 @@ pub fn search_highlight_style() -> Style {
 
 pub fn date_to_color(date: &str) -> Color {
     let today = Utc::now().date_naive();
-    let past_date = NaiveDate::parse_from_str(
-        &date,
-        "%Y-%m-%d",
-    ).unwrap_or(today.clone());
+    let past_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap_or(today.clone());
     let age_factor = (today - past_date).num_days() as f32 / (365.0 * 2.0);
 
     let clamped = age_factor.clamp(0.0, 1.0);

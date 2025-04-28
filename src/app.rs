@@ -5,7 +5,12 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{app_state::NotifChannel, config::MappingScope, pager_app::{PagerApp, PagerCommand}, ui::search_highlight_style};
+use crate::{
+    app_state::NotifChannel,
+    config::MappingScope,
+    pager_app::{PagerApp, PagerCommand},
+    ui::search_highlight_style,
+};
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
@@ -490,7 +495,9 @@ pub trait GitApp {
                     terminal.clear()?;
                     match action {
                         Action::OpenFilesApp => FilesApp::new(Some(rev))?.run(terminal)?,
-                        Action::OpenShowApp => PagerApp::new(PagerCommand::Show, vec![rev])?.run(terminal)?,
+                        Action::OpenShowApp => {
+                            PagerApp::new(Some(PagerCommand::Show(vec![rev])))?.run(terminal)?
+                        }
                         _ => (),
                     }
                     terminal.clear()?;

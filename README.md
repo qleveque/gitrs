@@ -10,6 +10,7 @@
 
 - [Features](#features)
 - [Usage](#usage)
+- [Git Pager](#git-pager)
 - [Default Key Bindings](#default-key-bindings)
 - [Actions](#actions)
 - [Configuration](#configuration)
@@ -40,6 +41,16 @@ gitrs reflog [...params]
 gitrs stash
 gitrs files [revision]
 gitrs blame <file> [line]
+```
+
+---
+
+### Git Pager
+
+You can configure Git to use gitrs as a pager.
+
+```bash
+git config --global core.pager "gitrs"
 ```
 
 ---
