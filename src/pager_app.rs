@@ -82,7 +82,8 @@ impl PagerApp {
             }
         }
         .ok_or_else(|| Error::GitParsingError)??
-        .replace("\t", "    ");
+        .replace("\t", "    ")
+        .replace("\r", "^M");
 
         let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
         let first_line = String::from_utf8(bytes)?;
@@ -127,7 +128,7 @@ impl PagerApp {
                     match next {
                         Some(res_line) => {
                             chunk.push(match res_line {
-                                Ok(line) => line.replace("\t", "    "),
+                                Ok(line) => line.replace("\t", "    ").replace("\r", "^M"),
                                 Err(_) => "\x1b[31m/!\\ *** ERROR *** /!\\: gitrs could not read that line\x1b[0m".to_string(),
                             })
                         }
