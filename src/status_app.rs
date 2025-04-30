@@ -134,6 +134,8 @@ pub struct StatusApp {
     git_files: HashMap<String, GitFile>,
     height: usize,
     default_state: ListState,
+    top_rect: Rect,
+    bottom_rect: Rect,
 }
 
 impl StatusApp {
@@ -148,6 +150,8 @@ impl StatusApp {
             git_files: HashMap::new(),
             height: 0,
             default_state: ListState::default(),
+            top_rect: Rect::default(),
+            bottom_rect: Rect::default(),
         };
         instance.reload()?;
         Ok(instance)
@@ -190,6 +194,22 @@ impl GitApp for StatusApp {
         &self.state
     }
 
+    fn on_click(&mut self) {
+        if self.top_rect.contains(self.state.mouse_position) {
+            self.staged_status = StagedStatus::Unstaged;
+            let delta = (self.state.mouse_position.y - self.top_rect.y) as usize;
+            if delta > 0 {
+                self.state.list_state.select(Some(self.state.list_state.offset() + delta - 1));
+            }
+        } else if self.bottom_rect.contains(self.state.mouse_position) {
+            self.staged_status = StagedStatus::Staged;
+            let delta = (self.state.mouse_position.y - self.bottom_rect.y) as usize;
+            if delta > 0 {
+                self.state.list_state.select(Some(self.state.list_state.offset() + delta - 1));
+            }
+        }
+    }
+
     fn get_text_line(&self, idx: usize) -> Option<String> {
         match self.get_current_table().get(idx) {
             Some((_, name)) => Some(name.to_string()),
@@ -229,6 +249,8 @@ impl GitApp for StatusApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(rect);
+        self.top_rect = chunks[0];
+        self.bottom_rect = chunks[1];
 
         let top_list = list_to_draw(
             &self.unstaged_table,
@@ -313,6 +335,24 @@ impl GitApp for StatusApp {
             Err(_) => None,
         };
         Ok((filename, Some("HEAD".to_string()), None))
+    }
+
+    fn on_scroll(&mut self, down: bool) {
+        if self.top_rect.contains(self.state.mouse_position) {
+            self.staged_status = StagedStatus::Unstaged;
+        } else if self.bottom_rect.contains(self.state.mouse_position) {
+            self.staged_status = StagedStatus::Staged;
+        };
+        let rect = match self.staged_status {
+            StagedStatus::Unstaged => self.top_rect,
+            StagedStatus::Staged => self.bottom_rect,
+        };
+        let table = self.get_current_table();
+        self.standard_on_scroll(
+            down,
+            rect.height as usize,
+            table.len(),
+        );
     }
 
     fn run_action(

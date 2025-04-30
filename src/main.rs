@@ -29,9 +29,7 @@ use app::GitApp;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use crossterm::{
-    execute,
-    style::Stylize,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    event::{DisableMouseCapture, EnableMouseCapture}, execute, style::Stylize, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 
 #[derive(Parser)]
@@ -101,6 +99,7 @@ fn prepare_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>, io:
     let terminal = Terminal::new(backend)?;
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
+    execute!(stdout(), EnableMouseCapture)?;
     Ok(terminal)
 }
 
@@ -108,6 +107,7 @@ fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>) 
     disable_raw_mode()?;
     terminal.show_cursor()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(stdout(), DisableMouseCapture)?;
     Ok(())
 }
 

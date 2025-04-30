@@ -33,6 +33,7 @@ struct BlameAppViewModel {
     blame_list: List<'static>,
     code_list: List<'static>,
     max_blame_len: usize,
+    rect: Rect,
 }
 
 pub struct BlameApp {
@@ -66,6 +67,7 @@ impl<'a> BlameApp {
                 blame_list: List::default(),
                 code_list: List::default(),
                 max_blame_len: 0,
+                rect: Rect::default(),
             },
         };
         instance.reload()?;
@@ -264,6 +266,7 @@ impl GitApp for BlameApp {
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
         self.view_model.height = rect.height as usize;
+        self.view_model.rect = rect;
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -352,5 +355,20 @@ impl GitApp for BlameApp {
             }
         };
         return Ok(());
+    }
+
+    fn on_click(&mut self) {
+        if self.view_model.rect.contains(self.state.mouse_position) {
+            let delta = (self.state.mouse_position.y - self.view_model.rect.y) as usize;
+            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+        }
+    }
+
+    fn on_scroll(&mut self, down: bool) {
+        self.standard_on_scroll(
+            down,
+            self.view_model.rect.height as usize,
+            self.code.len(),
+        );
     }
 }

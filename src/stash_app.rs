@@ -18,6 +18,7 @@ use ratatui::{backend::CrosstermBackend, style::Color, widgets::List, Terminal};
 struct StashAppViewModel {
     stash_list: List<'static>,
     height: usize,
+    rect: Rect,
 }
 
 pub struct StashApp {
@@ -35,6 +36,7 @@ impl StashApp {
             view_model: StashAppViewModel {
                 stash_list: List::default(),
                 height: 0,
+                rect: Rect::default(),
             },
         };
         r.reload()?;
@@ -98,6 +100,7 @@ impl GitApp for StashApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
+        self.view_model.rect = rect;
         if self.stashes.is_empty() {
             let paragraph = Paragraph::new("Stash list empty");
             frame.render_widget(paragraph, rect);
@@ -129,5 +132,20 @@ impl GitApp for StashApp {
     ) -> Result<(), Error> {
         self.run_generic_action(action, self.view_model.height, terminal)?;
         return Ok(());
+    }
+
+    fn on_click(&mut self) {
+        if self.view_model.rect.contains(self.state.mouse_position) {
+            let delta = (self.state.mouse_position.y - self.view_model.rect.y) as usize;
+            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+        }
+    }
+
+    fn on_scroll(&mut self, down: bool) {
+        self.standard_on_scroll(
+            down,
+            self.view_model.rect.height as usize,
+            self.stashes.len(),
+        );
     }
 }

@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use ratatui::widgets::ListState;
+use ratatui::{layout::{Position, Rect}, widgets::ListState};
 
 use crate::{
-    config::{parse_gitrs_config, Config},
-    errors::Error,
+    action::Action, config::{parse_gitrs_config, Config}, errors::Error
 };
 
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -33,6 +32,9 @@ pub struct AppState {
     pub command_string: String,
     pub input_state: InputState,
     pub list_state: ListState,
+    pub region_to_action: Vec<(Rect, Action)>,
+    pub mouse_position: Position,
+    pub mouse_down: bool,
 }
 
 impl AppState {
@@ -48,6 +50,9 @@ impl AppState {
             command_string: "".to_string(),
             input_state: InputState::App,
             list_state: ListState::default(),
+            region_to_action: Vec::new(),
+            mouse_position: Position::default(),
+            mouse_down: false,
         };
         return Ok(r);
     }

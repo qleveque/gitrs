@@ -22,6 +22,8 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 struct PagerAppViewModel {
     list: PagerWidget,
     height: usize,
+    rect: Rect,
+    scroll: Option<bool>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -156,6 +158,8 @@ impl PagerApp {
             view_model: PagerAppViewModel {
                 list: PagerWidget::default(),
                 height: 0,
+                rect: Rect::default(),
+                scroll: None,
             },
         };
         r.state.list_state.select_first();
@@ -268,15 +272,20 @@ impl GitApp for PagerApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
+        self.view_model.rect = rect;
         let idx = self.idx().unwrap_or(0);
         let idx = idx.checked_add(1).unwrap_or(0);
         let message = format!("line {} of {}", idx, self.lines.lock().unwrap().len());
         self.notif(NotifChannel::Line, message);
+        let scroll_step = self.state.config.scroll_step;
         self.view_model.list = PagerWidget::new(
             &self.lines.lock().unwrap(),
             self.view_model.height,
             &mut self.state,
+            self.view_model.scroll,
+            scroll_step,
         );
+        self.view_model.scroll = None;
         self.view_model.height = rect.height as usize;
         frame.render_widget(Clear, rect);
         self.view_model.list.render(rect, frame.buffer_mut());
@@ -361,5 +370,17 @@ impl GitApp for PagerApp {
         env::set_current_dir(self.original_dir.clone()).map_err(|_| {
             Error::GlobalError("could not restore initial working directory".to_string())
         })
+    }
+
+    fn on_scroll(&mut self, down: bool) {
+        self.view_model.scroll = Some(down);
+    }
+
+    fn on_click(&mut self) {
+        let rect = self.view_model.rect;
+        if rect.contains(self.state.mouse_position) {
+            let delta = (self.state.mouse_position.y - rect.y) as usize;
+            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+        }
     }
 }

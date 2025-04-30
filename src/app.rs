@@ -7,19 +7,19 @@ use std::{
 
 use crate::{
     app_state::NotifChannel,
-    config::MappingScope,
+    config::{Button, MappingScope},
     pager_app::{PagerApp, PagerCommand},
-    ui::{notif_style, search_highlight_style},
+    ui::{bar_style, button_style, clicked_button_style, hovered_button_style, search_highlight_style},
 };
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
-    event::{self, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Position, Rect},
     prelude::CrosstermBackend,
     style::{Color, Style},
     text::{Line, Text},
@@ -157,6 +157,65 @@ pub trait GitApp {
         }
     }
 
+    fn display_menu_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) -> Vec<(Rect, Action)> {
+        if !self.state().config.menu_bar {
+            return vec![];
+        }
+        let mut buttons: Vec<Button> = Vec::new();
+        for field in [
+            self.get_mapping_fields().as_slice(),
+            &[(MappingScope::Global, true)],
+        ]
+        .concat().iter().rev()
+        {
+            if field.1 {
+                if let Some(new_buttons) = self.state().config.buttons.get(&field.0) {
+                    buttons.extend(new_buttons.clone());
+                }
+            }
+        }
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .split(*chunk);
+
+        let mut constraints = vec![Constraint::Length(1)];
+        for button in &buttons {
+            constraints.push(Constraint::Length(button.0.chars().count() as u16));
+            constraints.push(Constraint::Length(1));
+        }
+
+        let horizontal_chunks = Layout::default()
+            .constraints(constraints)
+            .direction(Direction::Horizontal)
+            .split(chunks[0]);
+
+
+        let paragraph = Paragraph::default().style(bar_style());
+        Widget::render(&paragraph, chunks[0], frame.buffer_mut());
+
+        let mut region_to_action = Vec::new();
+
+        for (idx, button) in buttons.iter().enumerate() {
+            let chunk = horizontal_chunks[2 * idx + 1];
+            let style = if chunk.contains(self.get_state().mouse_position) {
+                if self.get_state().mouse_down {
+                    clicked_button_style()
+                } else {
+                    hovered_button_style()
+                }
+            } else {
+                button_style()
+            };
+            let paragraph = Paragraph::new(button.0.to_string()).style(style);
+            Widget::render(&paragraph, chunk, frame.buffer_mut());
+            region_to_action.push((chunk, button.1.clone()))
+        }
+        *chunk = chunks[1];
+        region_to_action
+    }
+
     fn display_search_bar(&mut self, chunk: &mut Rect, frame: &mut Frame) {
         let search_string = match self.state().search_reverse {
             false => format!("/{}│", self.state().search_string),
@@ -249,7 +308,7 @@ pub trait GitApp {
             })
             .collect();
         let paragraph = Paragraph::new(Text::from(lines))
-            .style(notif_style());
+            .style(bar_style());
 
         let len = self.state().notif.len() as u16;
         let chunks = Layout::default()
@@ -266,9 +325,11 @@ pub trait GitApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         let mut notif_time = 0;
+
         loop {
             terminal.draw(|mut frame| {
                 let mut chunk = frame.area();
+                self.state().region_to_action = self.display_menu_bar(&mut chunk, &mut frame);
 
                 self.draw(frame, chunk);
 
@@ -289,7 +350,7 @@ pub trait GitApp {
                 self.continue_search(search_idx)?;
             }
 
-            let opt_action = match self.handle_user_input() {
+            let opt_action = match self.handle_user_event() {
                 Err(err) => {
                     self.notif(NotifChannel::Error, err.to_string());
                     None
@@ -321,6 +382,17 @@ pub trait GitApp {
         Ok(())
     }
 
+
+    fn cancel_input(&mut self) {
+        let input_state = self.state().input_state.clone();
+        match input_state {
+            InputState::Search => self.state().search_string.clear(),
+            InputState::Command => self.state().command_string.clear(),
+            InputState::App => (),
+        }
+        self.state().input_state = InputState::App;
+    }
+
     fn handle_line_edited(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
         let input_state = self.state().input_state.clone();
         match key_event.code {
@@ -339,14 +411,7 @@ pub trait GitApp {
                     InputState::App => (),
                 }
             }
-            KeyCode::Esc => {
-                match input_state {
-                    InputState::Search => self.state().search_string.clear(),
-                    InputState::Command => self.state().command_string.clear(),
-                    InputState::App => (),
-                }
-                self.state().input_state = InputState::App;
-            }
+            KeyCode::Esc => self.cancel_input(),
             KeyCode::Backspace => {
                 match input_state {
                     InputState::Search => {
@@ -517,33 +582,118 @@ pub trait GitApp {
         Ok(())
     }
 
-    fn press_key() -> Result<Option<KeyEvent>, Error> {
+    fn handle_user_event(&mut self) -> Result<Option<Action>, Error> {
         if event::poll(std::time::Duration::from_millis(100))? {
-            if let event::Event::Key(key_event) = event::read()? {
-                if key_event.kind == KeyEventKind::Press {
-                    return Ok(Some(key_event));
+            let event = event::read()?;
+            match event {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.state().notif = HashMap::new();
+                    let input_state = self.state().input_state.clone();
+                    return if input_state == InputState::App {
+                        Ok(self.handle_key_event(key_event)?)
+                    } else {
+                        Ok(self.handle_line_edited(key_event)?)
+                    };
+                },
+                Event::Mouse(mouse_event) => {
+                    self.state().mouse_position = Position::new(mouse_event.column, mouse_event.row);
+                    match mouse_event.kind {
+                        MouseEventKind::Down(mouse_button) => {
+                            // for the time being, cancel line inputs
+                            self.cancel_input();
+                            self.state().notif = HashMap::new();
+                            self.state().mouse_down = true;
+                            return Ok(self.handle_click_event(mouse_button)?);
+                        },
+                        MouseEventKind::Up(_) => {
+                            self.state().mouse_down = false;
+                        },
+                        MouseEventKind::ScrollUp => {
+                            self.on_scroll(false);
+                        },
+                        MouseEventKind::ScrollDown => {
+                            self.on_scroll(true);
+                        },
+                        _ => (),
+                    };
+                },
+                _ => ()
+            }
+        }
+        return Ok(None);
+    }
+
+
+    fn on_scroll(&mut self, down: bool);
+    fn standard_on_scroll(
+        &mut self,
+        down: bool,
+        height: usize,
+        len: usize
+    ) {
+        let scroll_step = self.get_state().config.scroll_step;
+        let scroll_off = self.get_state().config.scroll_off;
+        let mut index = self.idx().unwrap_or(0);
+
+        let offset = self.state().list_state.offset_mut();
+        match down {
+            true => *offset += scroll_step,
+            false => if *offset > scroll_step {
+                *offset -= scroll_step
+            } else {
+                *offset = 0
+            },
+        };
+
+        if *offset + scroll_off >= index {
+            index = *offset + scroll_off;
+        }
+        if index >= len {
+            index = len - 1;
+        }
+        if *offset + height > scroll_off && index >= *offset + height - scroll_off {
+            index = *offset + height - scroll_off - 1;
+        }
+        self.state().list_state.select(Some(index));
+    }
+
+    fn on_click(&mut self) {}
+
+    fn handle_click_event(&mut self, mouse_button: MouseButton) -> Result<Option<Action>, Error> {
+        for (rect, action) in self.get_state().region_to_action.clone() {
+            if rect.contains(self.get_state().mouse_position) {
+                return Ok(Some(action));
+            }
+        }
+        self.on_click();
+
+        let mapping = match mouse_button {
+            MouseButton::Right => "<rclick>",
+            _ => {
+                return Ok(None)
+            },
+        };
+
+        let bindings = self.state().config.bindings.clone();
+
+        for field in [
+            self.get_mapping_fields().as_slice(),
+            &[(MappingScope::Global, true)],
+        ]
+        .concat()
+        {
+            if field.1 {
+                if let Some(mode_hotkeys) = bindings.get(&field.0) {
+                    for (key_combination, action) in mode_hotkeys {
+                        if key_combination == mapping {
+                            return Ok(Some(action.clone()));
+                        }
+                    }
                 }
             }
         }
+
         Ok(None)
-    }
-
-    fn handle_user_input(&mut self) -> Result<Option<Action>, Error> {
-        let key_event = match Self::press_key()? {
-            Some(key_event) => key_event,
-            None => {
-                return Ok(None);
-            }
-        };
-        // when user press key, we clear the messages
-        self.state().notif = HashMap::new();
-
-        let input_state = self.state().input_state.clone();
-        if input_state == InputState::App {
-            Ok(self.handle_key_event(key_event)?)
-        } else {
-            Ok(self.handle_line_edited(key_event)?)
-        }
     }
 
     fn run_command(
@@ -572,8 +722,20 @@ pub trait GitApp {
         command = command.replace("%(clip)", &self.state().config.clipboard_tool);
         command = command.replace("%(git)", &self.state().config.git_exe);
 
-        let mut bash_proc = Command::new("bash");
-        let proc = bash_proc.args(["-c", &command]);
+        #[cfg(unix)]
+        let shell = ("bash", "-c");
+
+        #[cfg(windows)]
+        let shell = ("cmd", "/C");
+
+        #[cfg(unix)]
+        let command = format!(r#"{} || (echo "Command failed. Press enter to continue..."; read)"#, command);
+
+        #[cfg(windows)]
+        let command = format!(r#"{} || (echo Command failed. Press enter to continue... && pause)"#, command);
+
+        let mut bash_proc = Command::new(shell.0);
+        let proc = bash_proc.args([shell.1, &command]);
 
         match command_type {
             CommandType::Async => {
@@ -585,12 +747,14 @@ pub trait GitApp {
             _ => {
                 disable_raw_mode()?;
                 execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+                execute!(stdout(), DisableMouseCapture)?;
                 terminal.show_cursor()?;
 
                 let mut child = proc.spawn()?;
                 child.wait()?;
 
                 enable_raw_mode()?;
+                execute!(stdout(), EnableMouseCapture)?;
                 execute!(stdout(), EnterAlternateScreen)?;
                 terminal.hide_cursor()?;
                 terminal.clear()?;

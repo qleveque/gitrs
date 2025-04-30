@@ -16,38 +16,90 @@ pub struct PagerWidget {
     state: ListState,
 }
 
+// duplicates some logic
+pub fn adapt_index_in_frame(
+    offset: usize,
+    scroll_off: usize,
+    mut index: usize,
+    height: usize,
+    len: usize
+) -> usize {
+    if offset + scroll_off >= index {
+        index = offset + scroll_off;
+    }
+    if index >= len {
+        index = len - 1;
+    }
+    if offset + height > scroll_off && index >= offset + height - scroll_off {
+        index = offset + height - scroll_off - 1;
+    }
+    index
+}
+
 impl PagerWidget {
-    pub fn new(items: &Vec<String>, height: usize, app_state: &mut AppState) -> Self {
+    pub fn new(
+        items: &Vec<String>,
+        height: usize,
+        app_state: &mut AppState,
+        scroll: Option<bool>,
+        scroll_step : usize,
+    ) -> Self {
         let scroll_off = app_state.config.scroll_off;
+
+        // ensure the real index is properly defined
         let mut index = app_state.list_state.selected().unwrap_or(0);
-        if items.len() == 0 {
-            return Self::default();
-        }
         if index >= items.len() {
             index = items.len() - 1;
         }
-        app_state.list_state.select(Some(index));
-
-        let mut offset = app_state.list_state.offset();
-        // increase offset
-        if index >= offset
-            && height >= (scroll_off + 1)
-            && index - offset > height - (scroll_off + 1)
-        {
-            offset = index + (scroll_off + 1) - height;
-            if items.len() >= height && offset > items.len() - height {
-                offset = items.len() - height;
-            }
+        if items.len() == 0 {
+            return Self::default();
         }
-        // reduce offset
-        if offset + scroll_off >= index {
-            offset = if scroll_off <= index {
-                index - scroll_off
-            } else {
-                0
+        let mut offset = app_state.list_state.offset();
+
+        match scroll {
+            None => {
+                // move manually from the boundaries index state
+                // increase offset
+                if index >= offset
+                    && height >= (scroll_off + 1)
+                    && index - offset > height - (scroll_off + 1)
+                {
+                    offset = index + (scroll_off + 1) - height;
+                    if items.len() >= height && offset > items.len() - height {
+                        offset = items.len() - height;
+                    }
+                }
+                // reduce offset
+                if offset + scroll_off >= index {
+                    offset = if scroll_off <= index {
+                        index - scroll_off
+                    } else {
+                        0
+                    }
+                }
+            },
+            Some(down) => {
+                match down {
+                    true => {
+                        offset += scroll_step;
+                        if items.len() >= scroll_off + 1 && offset >= items.len() - scroll_off - 1 {
+                            offset = items.len() - scroll_off - 1
+                        }
+                    },
+                    false => {
+                        if offset < scroll_step {
+                            offset = 0;
+                        } else {
+                            offset = offset - scroll_step;
+                        }
+                    },
+                };
+                index = adapt_index_in_frame(offset, scroll_off, index, height, items.len());
             }
         }
         *app_state.list_state.offset_mut() = offset;
+        app_state.list_state.select(Some(index));
+
 
         let first = app_state.list_state.offset();
         let last = min(first + height, items.len());

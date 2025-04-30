@@ -11,10 +11,30 @@ pub fn search_highlight_style() -> Style {
         .add_modifier(Modifier::REVERSED)
 }
 
-pub fn notif_style() -> Style {
+pub fn bar_style() -> Style {
     Style::default().bg(Color::Rgb(25, 25, 25))
 }
 
+pub fn button_style() -> Style {
+    Style::default()
+        .bg(Color::DarkGray)
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD)
+}
+
+pub fn hovered_button_style() -> Style {
+    Style::default()
+        .bg(Color::LightBlue)
+        .fg(Color::Black)
+        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+}
+
+pub fn clicked_button_style() -> Style {
+    Style::default()
+        .bg(Color::Blue)
+        .fg(Color::White)
+        .add_modifier(Modifier::REVERSED | Modifier::BOLD)
+}
 
 pub fn date_to_color(date: &str) -> Color {
     let today = Utc::now().date_naive();

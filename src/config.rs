@@ -51,13 +51,18 @@ impl FromStr for MappingScope {
 }
 
 pub type KeyBindings = HashMap<MappingScope, Vec<(String, Action)>>;
+pub type Button = (String, Action);
+pub type Buttons = HashMap<MappingScope, Vec<Button>>;
 
 pub struct Config {
     pub scroll_off: usize,
     pub git_exe: String,
     pub smart_case: bool,
+    pub scroll_step: usize,
+    pub menu_bar: bool,
     pub clipboard_tool: String,
     pub bindings: KeyBindings,
+    pub buttons: Buttons,
 }
 
 impl Default for Config {
@@ -76,7 +81,6 @@ impl Default for Config {
                     ("G".to_string(), Action::Last),
                     ("<end>".to_string(), Action::Last),
                     ("q".to_string(), Action::Quit),
-                    ("<esc>".to_string(), Action::Quit),
                     ("<c-u>".to_string(), Action::HalfPageUp),
                     ("<pgup>".to_string(), Action::HalfPageUp),
                     ("<c-d>".to_string(), Action::HalfPageDown),
@@ -106,18 +110,29 @@ impl Default for Config {
             ),
             (
                 MappingScope::Files,
-                vec![(
-                    "<cr>".to_string(),
-                    Action::Command(
-                        CommandType::Sync,
-                        "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                vec![
+                    (
+                        "<cr>".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                        ),
                     ),
-                )],
+                    (
+
+                        "<rclick>".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                        ),
+                    )
+                ],
             ),
             (
                 MappingScope::Blame,
                 vec![
                     ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("<rclick>".to_string(), Action::OpenFilesApp),
                     ("s".to_string(), Action::OpenShowApp),
                     ("l".to_string(), Action::NextCommitBlame),
                     ("<right>".to_string(), Action::NextCommitBlame),
@@ -129,6 +144,7 @@ impl Default for Config {
                 MappingScope::Stash,
                 vec![
                     ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("<rclick>".to_string(), Action::OpenFilesApp),
                     ("s".to_string(), Action::OpenShowApp),
                     (
                         "!a".to_string(),
@@ -148,6 +164,7 @@ impl Default for Config {
                 MappingScope::Pager,
                 vec![
                     ("<cr>".to_string(), Action::OpenFilesApp),
+                    ("<rclick>".to_string(), Action::OpenFilesApp),
                     ("s".to_string(), Action::OpenShowApp),
                     ("c".to_string(), Action::PagerNextCommit),
                     ("C".to_string(), Action::PreviousCommit),
@@ -158,6 +175,13 @@ impl Default for Config {
                             "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
                         ),
                     ),
+                    (
+                        "!r".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) rebase -i %(rev)^".to_string(),
+                        ),
+                    ),
                 ],
             ),
             (
@@ -165,6 +189,7 @@ impl Default for Config {
                 vec![
                     ("t".to_string(), Action::StageUnstageFile),
                     ("<space>".to_string(), Action::StageUnstageFile),
+                    ("<rclick>".to_string(), Action::StageUnstageFile),
                     ("T".to_string(), Action::StageUnstageFiles),
                     ("<tab>".to_string(), Action::StatusSwitchView),
                     ("K".to_string(), Action::FocusUnstagedView),
@@ -186,11 +211,11 @@ impl Default for Config {
                     ),
                     (
                         "!p".to_string(),
-                        Action::Command(CommandType::SyncQuit, "%(git) push".to_string()),
+                        Action::Command(CommandType::Sync, "%(git) push".to_string()),
                     ),
                     (
                         "!P".to_string(),
-                        Action::Command(CommandType::SyncQuit, "%(git) push --force".to_string()),
+                        Action::Command(CommandType::Sync, "%(git) push --force".to_string()),
                     ),
                 ],
             ),
@@ -231,14 +256,129 @@ impl Default for Config {
         .into_iter()
         .collect();
 
+        let buttons: Buttons = [
+            (
+                MappingScope::Global,
+                vec![
+                    (" X ".to_string(), Action::Quit),
+                ],
+            ),
+            (
+                MappingScope::Status,
+                vec![
+                    (" ⟳ ".to_string(), Action::Reload),
+                    (
+                        "Commit".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) commit".to_string()),
+                    ),
+                    (
+                        "Amend".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) commit --amend".to_string()),
+                    ),
+                    (
+                        "Fixup".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) commit --amend --no-edit".to_string()),
+                    ),
+                    (
+                        "Push".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) push".to_string()),
+                    ),
+                    (
+                        "Push Force".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) push --force".to_string()),
+                    ),
+                ],
+            ),
+            (
+                MappingScope::StatusUnstaged,
+                vec![
+                    ("Stage All".to_string(), Action::StageUnstageFiles),
+                    (
+                        "Diff".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool -- %(file)".to_string(),
+                        ),
+                    ),
+                    (
+                        "Restore".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) restore %(file)".to_string()),
+                    ),
+                ],
+            ),
+            (
+                MappingScope::StatusStaged,
+                vec![
+                    ("Unstage All".to_string(), Action::StageUnstageFiles),
+                    (
+                        "Diff".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool --staged -- %(file)".to_string(),
+                        )
+                    ),
+                ],
+            ),
+            (
+                MappingScope::Pager,
+                vec![
+                    (" ↑ ".to_string(), Action::PreviousCommit),
+                    (" ↓ ".to_string(), Action::PagerNextCommit),
+                    ("Show".to_string(), Action::OpenFilesApp),
+                    (
+                        "Diff".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) difftool %(rev)^..%(rev) -- %(file)".to_string(),
+                        ),
+                    ),
+                    (
+                        "Rebase".to_string(),
+                        Action::Command(
+                            CommandType::Sync,
+                            "%(git) rebase -i %(rev)^".to_string(),
+                        ),
+                    ),
+                ],
+            ),
+            (
+                MappingScope::Blame,
+                vec![
+                    (" ← ".to_string(), Action::PreviousCommitBlame),
+                    (" → ".to_string(), Action::NextCommitBlame),
+                    ("Show".to_string(), Action::OpenFilesApp),
+                ],
+            ),
+            (
+                MappingScope::Stash,
+                vec![
+                    (
+                        "Apply".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash apply".to_string()),
+                    ),
+                    (
+                        "Pop".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash pop".to_string()),
+                    ),
+                    (
+                        "Drop".to_string(),
+                        Action::Command(CommandType::Sync, "%(git) stash drop".to_string()),
+                    ),
+                ],
+            ),
+        ].into_iter().collect();
+
         let clipboard_tool = if cfg!(windows) { "clip.exe" } else { "xsel" }.to_string();
 
         Config {
-            scroll_off: 2,
+            scroll_off: 5,
             git_exe: "git".to_string(),
             smart_case: true,
+            scroll_step: 2,
+            menu_bar: true,
             clipboard_tool,
             bindings,
+            buttons,
         }
     }
 }
@@ -290,11 +430,18 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
                         "scrolloff" => {
                             let number: Result<usize, _> = value.parse();
                             if let Ok(so) = number {
-                                config.scroll_off = so
+                                config.scroll_off = so;
                             }
                         }
                         "git" => config.git_exe = value,
                         "smartcase" => config.smart_case = value == "true",
+                        "scrollstep" => {
+                            let number: Result<usize, _> = value.parse();
+                            if let Ok(ss) = number {
+                                config.scroll_step = ss;
+                            }
+                        },
+                        "menubar" => config.menu_bar = value == "true",
                         "clipboard" => config.clipboard_tool = value,
                         variable => return Err(Error::ParseVariableError(variable.to_string())),
                     }

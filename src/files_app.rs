@@ -26,6 +26,7 @@ struct FilesAppViewModel {
     file_list: List<'static>,
     commit_paragraph: Paragraph<'static>,
     files_height: usize,
+    rect: Rect,
 }
 
 pub struct FilesApp {
@@ -57,6 +58,7 @@ impl FilesApp {
                 file_list: List::default(),
                 commit_paragraph: Paragraph::default(),
                 files_height: 0,
+                rect: Rect::default(),
             },
         };
         r.reload()?;
@@ -157,6 +159,7 @@ impl GitApp for FilesApp {
             &mut self.state.list_state,
         );
         self.view_model.files_height = chunks[1].height as usize;
+        self.view_model.rect = chunks[1];
 
         self.highlight_search(
             frame,
@@ -191,5 +194,21 @@ impl GitApp for FilesApp {
     ) -> Result<(), Error> {
         self.run_generic_action(action, self.view_model.files_height, terminal)?;
         return Ok(());
+    }
+
+    fn on_click(&mut self) {
+        if self.view_model.rect.contains(self.state.mouse_position) {
+            let delta = (self.state.mouse_position.y - self.view_model.rect.y) as usize;
+            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+        }
+    }
+
+
+    fn on_scroll(&mut self, down: bool) {
+        self.standard_on_scroll(
+            down,
+            self.view_model.rect.height as usize,
+            self.commit.files.len(),
+        );
     }
 }

@@ -69,7 +69,7 @@ git config --global core.pager "gitrs"
 | <kbd>Ctrl+u</kbd> / <kbd>PageUp</kbd> | Half-page up |
 | <kbd>Ctrl+d</kbd> / <kbd>PageDown</kbd> | Half-page down |
 | <kbd>r</kbd> | Reload |
-| <kbd>q</kbd> / <kbd>Esc</kbd> | Quit |
+| <kbd>q</kbd> | Quit |
 | <kbd>/</kbd> / <kbd>Ctrl+f</kbd> | Search forward |
 | <kbd>?</kbd> | Search backward |
 | <kbd>n</kbd> | Next search result |
@@ -195,6 +195,8 @@ set <option> <value>
 | `clipboard` | Clipboard utility to use | `"clip.exe"` on Windows and `"xsel"` on Linux | string |
 | `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
 | `smartcase` | Use smart case or not | `"true"` | `"false" \| "true"` |
+| `scrollstep` | Configure number of lines per scroll step | `2` | `usize` |
+| `menubar` | Whether or not the menu bar is shown | `"true"` | `"false" \| "true"` |
 
 ---
 
