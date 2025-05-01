@@ -1,0 +1,109 @@
+# Don't get stuck
+map global q quit
+map global <esc> quit
+
+# Global shortcuts that applies to all the views
+map global k up
+map global <up> up
+map global j down
+map global <down> down
+map global gg first
+map global <home> first
+map global G last
+map global <end> last
+map global <c-u> half_page_u
+map global <pgup> half_page_up
+map global <c-d> half_page_down
+map global <pgdown> half_page_down
+map global zz shift_line_middle
+map global zt shift_line_top
+map global zb shift_line_bottom
+map global / search
+map global ? search_reverse
+map global <c-f> search
+map global : type_command
+map global n next_search_result
+map global N previous_search_result
+map global yc !echo '%(rev)' | %(clip)".to_string()
+map global yf !echo '%(file)' | %(clip)".to_string()
+map global yy !echo '%(text)' | %(clip)".to_string()
+map global s open_show_app
+map global d !%(git) difftool %(rev)^..%(rev) -- %(file)
+
+# Shortcuts that applies to pager views, so log, show and reflog
+map pager <cr> open_files_app
+map pager <rclick> open_files_app
+map pager c pager_next_commit
+map pager C previous_commit
+map pager !r !%(git) rebase -i %(rev)^
+
+# Files view
+map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
+map files <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
+
+# Blame view
+map blame <cr> open_files_app
+map blame <rclick> open_files_app
+map blame l next_commit_blame
+map blame <right> next_commit_blame
+map blame h previous_commit_blame
+map blame <left> previous_commit_blame
+
+# Stash view
+map stash <cr> open_files_app
+map stash <rclick> open_files_app
+map stash !a !%(git) stash apply
+map stash !p !%(git) stash pop
+map stash !d !%(git) stash drop
+
+# Status view
+map status <cr> stage_unstage_file
+map status <rclick> stage_unstage_file
+map status r reload
+map status t stage_unstage_file
+map status T stage_unstage_files
+map status <tab> status_switch_view
+map status K focus_unstaged_view
+map status J focus_staged_view
+map status !c !%(git) commit
+map status !a !%(git) commit --amend
+map status !n !%(git) commit --amend --no-edit
+map status !p !%(git) push
+map status !P !%(git) push --force
+map unstaged !r %(git) restore %(file)
+map untracked !r rm %(file)
+map unstaged d %(git) difftool -- %(file)
+map staged d %(git) difftool --staged -- %(file)
+
+# Buttons
+button global " X " quit
+
+button pager " ↵ " open_files_app
+button pager " ↑ " previous_commit
+button pager " ↓ " pager_next_commit
+button pager Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
+button pager Rebase !%(git) rebase -i %(rev)^
+
+button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
+
+button blame " ↵ " open_files_app
+button blame " ← " previous_commit_blame
+button blame " → " next_commit_blame
+
+button stash " ↵ " open_files_app
+button stash Apply !%(git) stash apply
+button stash Pop !%(git) stash pop
+button stash Drop !%(git) stash drop
+
+button status " ↵ " stage_unstage_file
+button status " ⟳ " reload
+button unstaged Diff !%(git) difftool -- %(file)
+button staged Diff !%(git) difftool --staged -- %(file)
+button unstaged "Stage All" stage_unstage_files
+button staged "Unstage All" stage_unstage_files
+button status Commit !%(git) commit
+button status Amend !%(git) commit --amend
+button status Fixup !%(git) commit --amend --no-edit
+button status Push !%(git) push
+button status Push Force !%(git) push --force
+button unstaged Restore !%(git) restore %(file)

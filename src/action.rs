@@ -61,6 +61,7 @@ impl FromStr for Action {
             "half_page_down" => Ok(Action::HalfPageDown),
             "shift_line_middle" => Ok(Action::ShiftLineMiddle),
             "shift_line_top" => Ok(Action::ShiftLineTop),
+            "shift_line_bottom" => Ok(Action::ShiftLineBottom),
             "next_search_result" => Ok(Action::NextSearchResult),
             "previous_search_result" => Ok(Action::PreviousSearchResult),
             "type_command" => Ok(Action::TypeCommand),
