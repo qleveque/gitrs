@@ -22,15 +22,15 @@
 | | <kbd>yc</kbd> | Yank commit hash |
 | | <kbd>yf</kbd> | Yank file path |
 | | <kbd>yy</kbd> | Yank text |
-| Pager | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+| Log, Show, Reflog | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>c</kbd> | Next commit |
 | | <kbd>C</kbd> | Previous commit |
 | | <kbd>!r</kbd> | Interactive rebase on commit |
-| Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool for file |
-| Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+| Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
+| Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
 | | <kbd>h</kbd>/<kbd>←</kbd> | Previous blame commit |
-| Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+| Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>!a</kbd> | Apply stash |
 | | <kbd>!p</kbd> | Pop stash |
 | | <kbd>!d</kbd> | Drop stash |

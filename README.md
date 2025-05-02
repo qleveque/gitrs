@@ -6,17 +6,6 @@
 
 ---
 
-## Table of Contents
-
-- [Features](#features)
-- [Usage](#usage)
-- [Default Key Bindings](#default-key-bindings)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
 ## Features
 
 * Status, Log, Show, Reflog, Files, Blame, and Stash views
@@ -77,7 +66,7 @@ set <option> <value>
 
 * `global`
 * `files`
-* `status` `unstaged` `staged` `unmerged` `untracked`
+* `status` `unstaged` `staged` `unmerged` `untracked` `modified` `deleted`
 * `pager` `show` `log` `reflog`
 * `blame`
 * `stash`
@@ -90,11 +79,11 @@ set <option> <value>
 | `clipboard` | Clipboard utility to use | `"clip.exe"` on Windows and `"xsel"` on Linux | string |
 | `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
 | `scroll_step` | Number of lines per scroll step | `2` | `usize` |
-| `smart_case` | Use smart case | `true` | `false | true` |
-| `menu_bar` | Show the menu bar | `true` | `false | true` |
-| `default_config` | Load the default configuration | `true` | `false | true` |
+| `smart_case` | Use smart case | `true` | `false \| true` |
+| `menu_bar` | Show the menu bar | `true` | `false \| true` |
+| `default_config` | Load the default configuration | `true` | `false \| true` |
 
-### Actions
+#### Actions
 
 An action can be a:
 

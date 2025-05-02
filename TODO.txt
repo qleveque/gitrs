@@ -1,7 +1,6 @@
-☐ improve the readme for the mouse functionalities (right click)
-☐ make the buttons configurable
+☑ improve the readme for the mouse functionalities (right click)
+☑ make the buttons configurable
 ☐ find a way to use unicode chars and nerdfonts
-
 ☐ handle file renaming in blame view
 ☐ correct author name width glitch in blame view
 ☐ handle multiple commands with one key binding

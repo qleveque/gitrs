@@ -69,7 +69,7 @@ map global yf !echo '%(file)' | %(clip)".to_string()
 # | | <kbd>yy</kbd> | Yank text |
 map global yy !echo '%(text)' | %(clip)".to_string()
 
-# | Pager | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+# | Log, Show, Reflog | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map pager <cr> open_files_app
 map pager <rclick> open_files_app
 
@@ -82,11 +82,11 @@ map pager C previous_commit
 # | | <kbd>!r</kbd> | Interactive rebase on commit |
 map pager !r !%(git) rebase -i %(rev)^
 
-# | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool for file |
+# | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
 map files <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
 
-# | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+# | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map blame <cr> open_files_app
 map blame <rclick> open_files_app
 
@@ -98,7 +98,7 @@ map blame <right> next_commit_blame
 map blame h previous_commit_blame
 map blame <left> previous_commit_blame
 
-# | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
+# | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map stash <cr> open_files_app
 map stash <rclick> open_files_app
 
@@ -149,9 +149,9 @@ map status !p !%(git) push
 map status !P !%(git) push --force
 
 # | | <kbd>!r</kbd> | Restore file / Remove file |
-map modified !r %(git) restore %(file)
-map deleted !r %(git) restore %(file)
-map untracked !r rm %(file)
+map modified !r !%(git) restore %(file)
+map deleted !r !%(git) restore %(file)
+map untracked !r !rm %(file)
 
 # | | <kbd>d</kbd> | Difftool on file |
 map unstaged d %(git) difftool -- %(file)
