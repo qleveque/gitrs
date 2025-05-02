@@ -12,118 +12,7 @@ use crate::{
     errors::Error,
 };
 
-const DEFAULT_CONFIG: &str = r#"
-# Don't get stuck
-map global q quit
-map global <esc> quit
-
-# Global shortcuts that applies to all the views
-map global k up
-map global <up> up
-map global j down
-map global <down> down
-map global gg first
-map global <home> first
-map global G last
-map global <end> last
-map global <c-u> half_page_u
-map global <pgup> half_page_up
-map global <c-d> half_page_down
-map global <pgdown> half_page_down
-map global zz shift_line_middle
-map global zt shift_line_top
-map global zb shift_line_bottom
-map global / search
-map global ? search_reverse
-map global <c-f> search
-map global : type_command
-map global n next_search_result
-map global N previous_search_result
-map global yc !echo '%(rev)' | %(clip)".to_string()
-map global yf !echo '%(file)' | %(clip)".to_string()
-map global yy !echo '%(text)' | %(clip)".to_string()
-map global s open_show_app
-map global d !%(git) difftool %(rev)^..%(rev) -- %(file)
-
-# Shortcuts that applies to pager views, so log, show and reflog
-map pager <cr> open_files_app
-map pager <rclick> open_files_app
-map pager c pager_next_commit
-map pager C previous_commit
-map pager !r !%(git) rebase -i %(rev)^
-
-# Files view
-map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
-map files <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
-
-# Blame view
-map blame <cr> open_files_app
-map blame <rclick> open_files_app
-map blame l next_commit_blame
-map blame <right> next_commit_blame
-map blame h previous_commit_blame
-map blame <left> previous_commit_blame
-
-# Stash view
-map stash <cr> open_files_app
-map stash <rclick> open_files_app
-map stash !a !%(git) stash apply
-map stash !p !%(git) stash pop
-map stash !d !%(git) stash drop
-
-# Status view
-map status <cr> stage_unstage_file
-map status <rclick> stage_unstage_file
-map status r reload
-map status t stage_unstage_file
-map status T stage_unstage_files
-map status <tab> status_switch_view
-map status K focus_unstaged_view
-map status J focus_staged_view
-map status !c !%(git) commit
-map status !a !%(git) commit --amend
-map status !n !%(git) commit --amend --no-edit
-map status !p !%(git) push
-map status !P !%(git) push --force
-map unstaged !r %(git) restore %(file)
-map untracked !r rm %(file)
-map unstaged d %(git) difftool -- %(file)
-map staged d %(git) difftool --staged -- %(file)
-
-# Buttons
-button global " X " quit
-
-button pager " ↵ " open_files_app
-button pager " ↑ " previous_commit
-button pager " ↓ " pager_next_commit
-button pager Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
-button pager Rebase !%(git) rebase -i %(rev)^
-
-button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
-
-button blame " ↵ " open_files_app
-button blame " ← " previous_commit_blame
-button blame " → " next_commit_blame
-
-button stash " ↵ " open_files_app
-button stash Apply !%(git) stash apply
-button stash Pop !%(git) stash pop
-button stash Drop !%(git) stash drop
-
-button status " ↵ " stage_unstage_file
-button status " ⟳ " reload
-button unstaged Diff !%(git) difftool -- %(file)
-button staged Diff !%(git) difftool --staged -- %(file)
-button unstaged "Stage All" stage_unstage_files
-button staged "Unstage All" stage_unstage_files
-button status Commit !%(git) commit
-button status Amend !%(git) commit --amend
-button status Fixup !%(git) commit --amend --no-edit
-button status Push !%(git) push
-button status Push Force !%(git) push --force
-button unstaged Restore !%(git) restore %(file)
-"#;
-
+const DEFAULT_CONFIG: &str = include_str!("../config/.gitrsrc");
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum MappingScope {
@@ -134,6 +23,8 @@ pub enum MappingScope {
     StatusStaged,
     StatusUnmerged,
     StatusUntracked,
+    StatusModified,
+    StatusDeleted,
     Pager,
     Log,
     Show,
@@ -153,6 +44,8 @@ impl FromStr for MappingScope {
             "unstaged" => Ok(MappingScope::StatusUnstaged),
             "staged" => Ok(MappingScope::StatusStaged),
             "unmerged" => Ok(MappingScope::StatusUnmerged),
+            "modified" => Ok(MappingScope::StatusModified),
+            "deleted" => Ok(MappingScope::StatusDeleted),
             "untracked" => Ok(MappingScope::StatusUntracked),
             "pager" => Ok(MappingScope::Pager),
             "log" => Ok(MappingScope::Log),
@@ -170,7 +63,7 @@ pub type Button = (String, Action);
 pub type Buttons = HashMap<MappingScope, Vec<Button>>;
 
 pub struct Config {
-    pub scroll_off: usize,
+    pub scrolloff: usize,
     pub git_exe: String,
     pub smart_case: bool,
     pub scroll_step: usize,
@@ -181,6 +74,12 @@ pub struct Config {
 }
 
 impl Config {
+    fn check_no_default_config(&mut self, line: &str) {
+        if line == "set default_config false" {
+            self.bindings.clear();
+            self.buttons.clear();
+        }
+    }
     fn parse_line(&mut self, line: &str) -> Result<(), Error> {
         let keyword = line
             .split_once(' ')
@@ -216,19 +115,20 @@ impl Config {
                     "scrolloff" => {
                         let number: Result<usize, _> = value.parse();
                         if let Ok(so) = number {
-                            self.scroll_off = so;
+                            self.scrolloff = so;
                         }
                     }
                     "git" => self.git_exe = value,
-                    "smartcase" => self.smart_case = value == "true",
-                    "scrollstep" => {
+                    "smart_case" => self.smart_case = value == "true",
+                    "scroll_step" => {
                         let number: Result<usize, _> = value.parse();
                         if let Ok(ss) = number {
                             self.scroll_step = ss;
                         }
                     },
-                    "menubar" => self.menu_bar = value == "true",
+                    "menu_bar" => self.menu_bar = value == "true",
                     "clipboard" => self.clipboard_tool = value,
+                    "default_config" => (),
                     variable => return Err(Error::ParseVariableError(variable.to_string())),
                 }
             },
@@ -258,7 +158,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         let mut config = Config {
-            scroll_off: 5,
+            scrolloff: 5,
             git_exe: "git".to_string(),
             smart_case: true,
             scroll_step: 2,
@@ -284,9 +184,16 @@ pub fn parse_gitrs_config() -> Result<Config, Error> {
 
     if let Ok(file) = result {
         let reader = BufReader::new(file);
+        let lines: Vec<String> = reader
+            .lines()
+            .collect::<Result<_, _>>()?; // collect into Vec<String> or return error if any line fails
 
-        for line in reader.lines() {
-            config.parse_line(&line?)?;
+        for line in &lines {
+            config.check_no_default_config(line);
+        }
+
+        for line in &lines {
+            config.parse_line(line)?;
         }
     }
 

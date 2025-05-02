@@ -123,7 +123,7 @@ fn list_to_draw<'a>(
         .block(Block::default().title(title).borders(Borders::TOP))
         .style(Style::from(Color::White))
         .highlight_style(Style::from(Color::Black).bg(color))
-        .scroll_padding(config.scroll_off);
+        .scroll_padding(config.scrolloff);
 }
 
 pub struct StatusApp {
@@ -311,6 +311,16 @@ impl GitApp for StatusApp {
                 MappingScope::StatusUnmerged,
                 self.staged_status == StagedStatus::Unstaged
                     && git_file.unstaged_status == FileStatus::Unmerged,
+            ),
+            (
+                MappingScope::StatusModified,
+                self.staged_status == StagedStatus::Unstaged
+                    && git_file.unstaged_status == FileStatus::Modified,
+            ),
+            (
+                MappingScope::StatusDeleted,
+                self.staged_status == StagedStatus::Unstaged
+                    && git_file.unstaged_status == FileStatus::Deleted,
             ),
             (
                 MappingScope::StatusUntracked,

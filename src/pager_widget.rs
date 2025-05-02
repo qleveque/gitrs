@@ -19,19 +19,19 @@ pub struct PagerWidget {
 // duplicates some logic
 pub fn adapt_index_in_frame(
     offset: usize,
-    scroll_off: usize,
+    scrolloff: usize,
     mut index: usize,
     height: usize,
     len: usize
 ) -> usize {
-    if offset + scroll_off >= index {
-        index = offset + scroll_off;
+    if offset + scrolloff >= index {
+        index = offset + scrolloff;
     }
     if index >= len {
         index = len - 1;
     }
-    if offset + height > scroll_off && index >= offset + height - scroll_off {
-        index = offset + height - scroll_off - 1;
+    if offset + height > scrolloff && index >= offset + height - scrolloff {
+        index = offset + height - scrolloff - 1;
     }
     index
 }
@@ -44,7 +44,7 @@ impl PagerWidget {
         scroll: Option<bool>,
         scroll_step : usize,
     ) -> Self {
-        let scroll_off = app_state.config.scroll_off;
+        let scrolloff = app_state.config.scrolloff;
 
         // ensure the real index is properly defined
         let mut index = app_state.list_state.selected().unwrap_or(0);
@@ -61,18 +61,18 @@ impl PagerWidget {
                 // move manually from the boundaries index state
                 // increase offset
                 if index >= offset
-                    && height >= (scroll_off + 1)
-                    && index - offset > height - (scroll_off + 1)
+                    && height >= (scrolloff + 1)
+                    && index - offset > height - (scrolloff + 1)
                 {
-                    offset = index + (scroll_off + 1) - height;
+                    offset = index + (scrolloff + 1) - height;
                     if items.len() >= height && offset > items.len() - height {
                         offset = items.len() - height;
                     }
                 }
                 // reduce offset
-                if offset + scroll_off >= index {
-                    offset = if scroll_off <= index {
-                        index - scroll_off
+                if offset + scrolloff >= index {
+                    offset = if scrolloff <= index {
+                        index - scrolloff
                     } else {
                         0
                     }
@@ -82,8 +82,8 @@ impl PagerWidget {
                 match down {
                     true => {
                         offset += scroll_step;
-                        if items.len() >= scroll_off + 1 && offset >= items.len() - scroll_off - 1 {
-                            offset = items.len() - scroll_off - 1
+                        if items.len() >= scrolloff + 1 && offset >= items.len() - scrolloff - 1 {
+                            offset = items.len() - scrolloff - 1
                         }
                     },
                     false => {
@@ -94,7 +94,7 @@ impl PagerWidget {
                         }
                     },
                 };
-                index = adapt_index_in_frame(offset, scroll_off, index, height, items.len());
+                index = adapt_index_in_frame(offset, scrolloff, index, height, items.len());
             }
         }
         *app_state.list_state.offset_mut() = offset;

@@ -632,7 +632,7 @@ pub trait GitApp {
         len: usize
     ) {
         let scroll_step = self.get_state().config.scroll_step;
-        let scroll_off = self.get_state().config.scroll_off;
+        let scrolloff = self.get_state().config.scrolloff;
         let mut index = self.idx().unwrap_or(0);
 
         let offset = self.state().list_state.offset_mut();
@@ -645,14 +645,14 @@ pub trait GitApp {
             },
         };
 
-        if *offset + scroll_off >= index {
-            index = *offset + scroll_off;
+        if *offset + scrolloff >= index {
+            index = *offset + scrolloff;
         }
         if index >= len {
             index = len - 1;
         }
-        if *offset + height > scroll_off && index >= *offset + height - scroll_off {
-            index = *offset + height - scroll_off - 1;
+        if *offset + height > scrolloff && index >= *offset + height - scrolloff {
+            index = *offset + height - scrolloff - 1;
         }
         self.state().list_state.select(Some(index));
     }

@@ -120,7 +120,7 @@ impl GitApp for FilesApp {
             .block(Block::default().borders(Borders::NONE))
             .style(Style::from(Color::White))
             .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            .scroll_padding(self.state.config.scroll_off);
+            .scroll_padding(self.state.config.scrolloff);
 
         let metadata = Self::display_commit_metadata(self.commit.metadata.clone());
         self.view_model.commit_paragraph = metadata.block(Block::default().borders(Borders::NONE));

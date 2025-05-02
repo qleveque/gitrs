@@ -87,7 +87,7 @@ impl GitApp for StashApp {
             .collect();
         self.view_model.stash_list = List::new(list_items)
             .highlight_style(highlight_style())
-            .scroll_padding(self.state.config.scroll_off);
+            .scroll_padding(self.state.config.scrolloff);
 
         Ok(())
     }

@@ -1,109 +1,200 @@
-# Don't get stuck
+# | View | Keys | Action |
+# |:---|:---|:---|
+
+# | All | <kbd>q</kbd>/<kbd>Esc</kbd> | Quit |
 map global q quit
 map global <esc> quit
 
-# Global shortcuts that applies to all the views
+# | | <kbd>k</kbd>/<kbd>↑</kbd> | Up |
 map global k up
 map global <up> up
+
+# | | <kbd>j</kbd>/<kbd>↓</kbd> | Down |
 map global j down
 map global <down> down
+
+# | | <kbd>g</kbd><kbd>g</kbd>/<kbd>Home</kbd> | Go to first line |
 map global gg first
 map global <home> first
+
+# | | <kbd>G</kbd>/<kbd>End</kbd> | Go to last line |
 map global G last
 map global <end> last
-map global <c-u> half_page_u
+
+# | | <kbd>Ctrl</kbd><kbd>u</kbd>/<kbd>PgUp</kbd> | Half page up |
+map global <c-u> half_page_up
 map global <pgup> half_page_up
+
+# | | <kbd>Ctrl</kbd><kbd>d</kbd>/<kbd>PgDown</kbd> | Half page down |
 map global <c-d> half_page_down
 map global <pgdown> half_page_down
+
+# | | <kbd>zz</kbd> | Center current line |
 map global zz shift_line_middle
+
+# | | <kbd>zt</kbd> | Align line to top |
 map global zt shift_line_top
+
+# | | <kbd>zb</kbd> | Align line to bottom |
 map global zb shift_line_bottom
+
+# | | <kbd>/</kbd>/<kbd>Ctrl</kbd><kbd>f</kbd> | Search forward |
 map global / search
-map global ? search_reverse
 map global <c-f> search
+
+# | | <kbd>?</kbd> | Search backward |
+map global ? search_reverse
+
+# | | <kbd>:</kbd> | Enter command |
 map global : type_command
+
+# | | <kbd>n</kbd> | Next search result |
 map global n next_search_result
+
+# | | <kbd>N</kbd> | Previous search result |
 map global N previous_search_result
-map global yc !echo '%(rev)' | %(clip)".to_string()
-map global yf !echo '%(file)' | %(clip)".to_string()
-map global yy !echo '%(text)' | %(clip)".to_string()
+
+# | | <kbd>s</kbd> | Open show view |
 map global s open_show_app
+
+# | | <kbd>d</kbd> | Git difftool on current rev and file |
 map global d !%(git) difftool %(rev)^..%(rev) -- %(file)
 
-# Shortcuts that applies to pager views, so log, show and reflog
+# | | <kbd>yc</kbd> | Yank commit hash |
+map global yc !echo '%(rev)' | %(clip)".to_string()
+
+# | | <kbd>yf</kbd> | Yank file path |
+map global yf !echo '%(file)' | %(clip)".to_string()
+
+# | | <kbd>yy</kbd> | Yank text |
+map global yy !echo '%(text)' | %(clip)".to_string()
+
+# | Pager | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
 map pager <cr> open_files_app
 map pager <rclick> open_files_app
+
+# | | <kbd>c</kbd> | Next commit |
 map pager c pager_next_commit
+
+# | | <kbd>C</kbd> | Previous commit |
 map pager C previous_commit
+
+# | | <kbd>!r</kbd> | Interactive rebase on commit |
 map pager !r !%(git) rebase -i %(rev)^
 
-# Files view
+# | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool for file |
 map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
 map files <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
 
-# Blame view
+# | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
 map blame <cr> open_files_app
 map blame <rclick> open_files_app
+
+# | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
 map blame l next_commit_blame
 map blame <right> next_commit_blame
+
+# | | <kbd>h</kbd>/<kbd>←</kbd> | Previous blame commit |
 map blame h previous_commit_blame
 map blame <left> previous_commit_blame
 
-# Stash view
+# | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open file |
 map stash <cr> open_files_app
 map stash <rclick> open_files_app
+
+# | | <kbd>!a</kbd> | Apply stash |
 map stash !a !%(git) stash apply
+
+# | | <kbd>!p</kbd> | Pop stash |
 map stash !p !%(git) stash pop
+
+# | | <kbd>!d</kbd> | Drop stash |
 map stash !d !%(git) stash drop
 
-# Status view
+# | Status | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Stage/unstage file |
 map status <cr> stage_unstage_file
 map status <rclick> stage_unstage_file
+
+# | | <kbd>r</kbd> | Reload status |
 map status r reload
+
+# | | <kbd>t</kbd> | Toggle stage file |
 map status t stage_unstage_file
+
+# | | <kbd>T</kbd> | Toggle stage all |
 map status T stage_unstage_files
+
+# | | <kbd>Tab</kbd> | Switch status view |
 map status <tab> status_switch_view
+
+# | | <kbd>K</kbd> | Focus unstaged view |
 map status K focus_unstaged_view
+
+# | | <kbd>J</kbd> | Focus staged view |
 map status J focus_staged_view
+
+# | | <kbd>!c</kbd> | Commit |
 map status !c !%(git) commit
+
+# | | <kbd>!a</kbd> | Amend commit |
 map status !a !%(git) commit --amend
+
+# | | <kbd>!n</kbd> | Fixup (amend without editing) |
 map status !n !%(git) commit --amend --no-edit
+
+# | | <kbd>!p</kbd> | Push |
 map status !p !%(git) push
+
+# | | <kbd>!P</kbd> | Force push |
 map status !P !%(git) push --force
-map unstaged !r %(git) restore %(file)
+
+# | | <kbd>!r</kbd> | Restore file / Remove file |
+map modified !r %(git) restore %(file)
+map deleted !r %(git) restore %(file)
 map untracked !r rm %(file)
+
+# | | <kbd>d</kbd> | Difftool on file |
 map unstaged d %(git) difftool -- %(file)
 map staged d %(git) difftool --staged -- %(file)
 
 # Buttons
 button global " X " quit
 
+# Pager: Log, Show, Reflog
 button pager " ↵ " open_files_app
-button pager " ↑ " previous_commit
 button pager " ↓ " pager_next_commit
+button pager " ↑ " pager_previous_commit
 button pager Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
 button pager Rebase !%(git) rebase -i %(rev)^
 
+# Files
 button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
 
+# Blame
 button blame " ↵ " open_files_app
 button blame " ← " previous_commit_blame
 button blame " → " next_commit_blame
 
+# Stash
 button stash " ↵ " open_files_app
 button stash Apply !%(git) stash apply
 button stash Pop !%(git) stash pop
 button stash Drop !%(git) stash drop
 
+# Status
 button status " ↵ " stage_unstage_file
 button status " ⟳ " reload
-button unstaged Diff !%(git) difftool -- %(file)
-button staged Diff !%(git) difftool --staged -- %(file)
 button unstaged "Stage All" stage_unstage_files
 button staged "Unstage All" stage_unstage_files
+button unstaged Diff !%(git) difftool -- %(file)
+button staged Diff !%(git) difftool --staged -- %(file)
+# Commit/Push
 button status Commit !%(git) commit
 button status Amend !%(git) commit --amend
 button status Fixup !%(git) commit --amend --no-edit
 button status Push !%(git) push
 button status Push Force !%(git) push --force
-button unstaged Restore !%(git) restore %(file)
+# Restore
+button modified Restore !%(git) restore %(file)
+button deleted Restore !%(git) restore %(file)
+button untracked Delete !rm %(file)

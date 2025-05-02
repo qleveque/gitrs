@@ -241,7 +241,7 @@ impl GitApp for BlameApp {
 
         self.view_model.blame_list = List::new(blame_items)
             .highlight_style(highlight_style())
-            .scroll_padding(self.state.config.scroll_off);
+            .scroll_padding(self.state.config.scrolloff);
 
         let code_items: Vec<ListItem> = self
             .highlighted_lines()?
@@ -251,7 +251,7 @@ impl GitApp for BlameApp {
         self.view_model.code_list = List::new(code_items)
             .block(Block::default().borders(Borders::LEFT))
             .highlight_style(highlight_style())
-            .scroll_padding(self.state.config.scroll_off);
+            .scroll_padding(self.state.config.scrolloff);
 
         match self.state().list_state.selected() {
             None => self.state().list_state.select(Some(len - 1)),
