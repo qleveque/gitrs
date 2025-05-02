@@ -57,7 +57,7 @@ pub trait GitApp {
             .selected()
             .ok_or_else(|| Error::StateIndexError)
     }
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)>;
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope>;
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error>;
 
     fn run_action(
@@ -164,14 +164,12 @@ pub trait GitApp {
         let mut buttons: Vec<Button> = Vec::new();
         for field in [
             self.get_mapping_fields().as_slice(),
-            &[(MappingScope::Global, true)],
+            &[MappingScope::Global],
         ]
         .concat().iter().rev()
         {
-            if field.1 {
-                if let Some(new_buttons) = self.state().config.buttons.get(&field.0) {
-                    buttons.extend(new_buttons.clone());
-                }
+            if let Some(new_buttons) = self.state().config.buttons.get(&field) {
+                buttons.extend(new_buttons.clone());
             }
         }
 
@@ -473,14 +471,11 @@ pub trait GitApp {
         let mut potential = false;
         for field in [
             self.get_mapping_fields().as_slice(),
-            &[(MappingScope::Global, true)],
+            &[MappingScope::Global],
         ]
         .concat()
         {
-            if !field.1 {
-                continue;
-            }
-            if let Some(mode_hotkeys) = bindings.get(&field.0) {
+            if let Some(mode_hotkeys) = bindings.get(&field) {
                 for (key_combination, action) in mode_hotkeys {
                     if *key_combination == keys {
                         self.state().key_combination.clear();
@@ -678,16 +673,14 @@ pub trait GitApp {
 
         for field in [
             self.get_mapping_fields().as_slice(),
-            &[(MappingScope::Global, true)],
+            &[MappingScope::Global],
         ]
         .concat()
         {
-            if field.1 {
-                if let Some(mode_hotkeys) = bindings.get(&field.0) {
-                    for (key_combination, action) in mode_hotkeys {
-                        if key_combination == mapping {
-                            return Ok(Some(action.clone()));
-                        }
+            if let Some(mode_hotkeys) = bindings.get(&field) {
+                for (key_combination, action) in mode_hotkeys {
+                    if key_combination == mapping {
+                        return Ok(Some(action.clone()));
                     }
                 }
             }

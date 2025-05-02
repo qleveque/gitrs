@@ -2,12 +2,12 @@ use std::{
     collections::HashMap,
     env,
     io::{BufRead, BufReader},
-    process::{exit, ChildStdout, Command, Stdio},
+    process::{exit, ChildStdout, Command, Stdio}, str::FromStr,
 };
 
 use crate::{config::Config, errors::Error};
 
-#[derive(Debug, Clone, Copy, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
 pub enum FileStatus {
     None = 0,
@@ -30,12 +30,39 @@ impl FileStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+impl FromStr for FileStatus {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "modified" => Ok(FileStatus::Modified),
+            "new" => Ok(FileStatus::New),
+            "deleted" => Ok(FileStatus::Deleted),
+            "conflicted" => Ok(FileStatus::Unmerged),
+            _ => Err(Error::ParseMappingScopeError(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u8)]
 pub enum StagedStatus {
     Unstaged = 0,
     Staged = 1,
 }
+
+impl FromStr for StagedStatus {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "unstaged" => Ok(StagedStatus::Unstaged),
+            "staged" => Ok(StagedStatus::Staged),
+            _ => Err(Error::ParseMappingScopeError(s.to_string())),
+        }
+    }
+}
+
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum GitOp {

@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::{
     action::Action,
-    errors::Error,
+    errors::Error, git::{FileStatus, StagedStatus},
 };
 
 const DEFAULT_CONFIG: &str = include_str!("../config/.gitrsrc");
@@ -17,14 +17,8 @@ const DEFAULT_CONFIG: &str = include_str!("../config/.gitrsrc");
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum MappingScope {
     Global,
-    Files,
-    Status,
-    StatusUnstaged,
-    StatusStaged,
-    StatusUnmerged,
-    StatusUntracked,
-    StatusModified,
-    StatusDeleted,
+    Files(Option<FileStatus>),
+    Status(Option<StagedStatus>, Option<FileStatus>),
     Pager,
     Log,
     Show,
@@ -37,23 +31,36 @@ impl FromStr for MappingScope {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        let mut split = s.split(':');
+        let key = split.next().unwrap_or("");
+
+        match key {
             "global" => Ok(MappingScope::Global),
-            "files" => Ok(MappingScope::Files),
-            "status" => Ok(MappingScope::Status),
-            "unstaged" => Ok(MappingScope::StatusUnstaged),
-            "staged" => Ok(MappingScope::StatusStaged),
-            "unmerged" => Ok(MappingScope::StatusUnmerged),
-            "modified" => Ok(MappingScope::StatusModified),
-            "deleted" => Ok(MappingScope::StatusDeleted),
-            "untracked" => Ok(MappingScope::StatusUntracked),
             "pager" => Ok(MappingScope::Pager),
             "log" => Ok(MappingScope::Log),
             "show" => Ok(MappingScope::Show),
             "reflog" => Ok(MappingScope::Reflog),
             "stash" => Ok(MappingScope::Stash),
             "blame" => Ok(MappingScope::Blame),
-            _ => return Err(Error::ParseMappingScopeError(s.to_string())),
+            "files" => {
+                let file_status = match split.next() {
+                    Some(file_status_str) => Some(file_status_str.parse()?),
+                    None => None,
+                };
+                Ok(MappingScope::Files(file_status))
+            },
+            "status" => {
+                let staged_status = match split.next() {
+                    Some(staged_status_str) => Some(staged_status_str.parse()?),
+                    None => None,
+                };
+                let file_status = match split.next() {
+                    Some(file_status_str) => Some(file_status_str.parse()?),
+                    None => None,
+                };
+                Ok(MappingScope::Status(staged_status, file_status))
+            },
+            _ => Err(Error::ParseMappingScopeError(s.to_string())),
         }
     }
 }

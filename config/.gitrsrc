@@ -61,13 +61,13 @@ map global s open_show_app
 map global d !%(git) difftool %(rev)^..%(rev) -- %(file)
 
 # | | <kbd>yc</kbd> | Yank commit hash |
-map global yc !echo '%(rev)' | %(clip)".to_string()
+map global yc !echo '%(rev)' | %(clip)
 
 # | | <kbd>yf</kbd> | Yank file path |
-map global yf !echo '%(file)' | %(clip)".to_string()
+map global yf !echo '%(file)' | %(clip)
 
 # | | <kbd>yy</kbd> | Yank text |
-map global yy !echo '%(text)' | %(clip)".to_string()
+map global yy !echo '%(text)' | %(clip)
 
 # | Log, Show, Reflog | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map pager <cr> open_files_app
@@ -149,13 +149,13 @@ map status !p !%(git) push
 map status !P !%(git) push --force
 
 # | | <kbd>!r</kbd> | Restore file / Remove file |
-map modified !r !%(git) restore %(file)
-map deleted !r !%(git) restore %(file)
-map untracked !r !rm %(file)
+map status:unstaged:modified !r !%(git) restore %(file)
+map status:unstaged:deleted !r !%(git) restore %(file)
+map status:unstaged:new !r !rm %(file)
 
 # | | <kbd>d</kbd> | Difftool on file |
-map unstaged d %(git) difftool -- %(file)
-map staged d %(git) difftool --staged -- %(file)
+map status:unstaged d !%(git) difftool -- %(file)
+map status:staged d !%(git) difftool --staged -- %(file)
 
 # Buttons
 button global " X " quit
@@ -184,10 +184,10 @@ button stash Drop !%(git) stash drop
 # Status
 button status " ↵ " stage_unstage_file
 button status " ⟳ " reload
-button unstaged "Stage All" stage_unstage_files
-button staged "Unstage All" stage_unstage_files
-button unstaged Diff !%(git) difftool -- %(file)
-button staged Diff !%(git) difftool --staged -- %(file)
+button status:unstaged "Stage All" stage_unstage_files
+button status:staged "Unstage All" stage_unstage_files
+button status:unstaged Diff !%(git) difftool -- %(file)
+button status:staged Diff !%(git) difftool --staged -- %(file)
 # Commit/Push
 button status Commit !%(git) commit
 button status Amend !%(git) commit --amend
@@ -195,6 +195,6 @@ button status Fixup !%(git) commit --amend --no-edit
 button status Push !%(git) push
 button status Push Force !%(git) push --force
 # Restore
-button modified Restore !%(git) restore %(file)
-button deleted Restore !%(git) restore %(file)
-button untracked Delete !rm %(file)
+button status:unstaged:modified Restore !%(git) restore %(file)
+button status:unstaged:deleted Restore !%(git) restore %(file)
+button status:unstaged:new Delete !rm %(file)

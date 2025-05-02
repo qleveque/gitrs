@@ -172,8 +172,16 @@ impl GitApp for FilesApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
-        vec![(MappingScope::Files, true)]
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+        let file = self
+            .commit
+            .files
+            .get(self.idx().unwrap_or(usize::MAX))
+            .map(|(a, _)| a);
+        vec![
+            MappingScope::Files(file.copied()),
+            MappingScope::Files(None),
+        ]
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {

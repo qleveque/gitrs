@@ -301,41 +301,19 @@ impl GitApp for StatusApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
         let git_file = match self.get_mut_git_file() {
             Ok(git_file) => git_file,
-            Err(_) => return vec![(MappingScope::Status, true)],
+            Err(_) => return vec![MappingScope::Status(None, None)],
+        };
+        let file_status = match self.staged_status {
+            StagedStatus::Staged => git_file.staged_status,
+            StagedStatus::Unstaged => git_file.unstaged_status,
         };
         vec![
-            (
-                MappingScope::StatusUnmerged,
-                self.staged_status == StagedStatus::Unstaged
-                    && git_file.unstaged_status == FileStatus::Unmerged,
-            ),
-            (
-                MappingScope::StatusModified,
-                self.staged_status == StagedStatus::Unstaged
-                    && git_file.unstaged_status == FileStatus::Modified,
-            ),
-            (
-                MappingScope::StatusDeleted,
-                self.staged_status == StagedStatus::Unstaged
-                    && git_file.unstaged_status == FileStatus::Deleted,
-            ),
-            (
-                MappingScope::StatusUntracked,
-                self.staged_status == StagedStatus::Unstaged
-                    && git_file.unstaged_status == FileStatus::New,
-            ),
-            (
-                MappingScope::StatusStaged,
-                self.staged_status == StagedStatus::Staged,
-            ),
-            (
-                MappingScope::StatusUnstaged,
-                self.staged_status == StagedStatus::Unstaged,
-            ),
-            (MappingScope::Status, true),
+            MappingScope::Status(Some(self.staged_status), Some(file_status)),
+            MappingScope::Status(Some(self.staged_status), None),
+            MappingScope::Status(None, None),
         ]
     }
 

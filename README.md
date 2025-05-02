@@ -65,8 +65,8 @@ set <option> <value>
 #### Scopes
 
 * `global`
-* `files`
-* `status` `unstaged` `staged` `unmerged` `untracked` `modified` `deleted`
+* `files[:(new|modified|deleted|conflicted)]`
+* `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
 * `pager` `show` `log` `reflog`
 * `blame`
 * `stash`

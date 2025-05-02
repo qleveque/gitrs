@@ -301,8 +301,8 @@ impl GitApp for BlameApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
-        vec![(MappingScope::Blame, true)]
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+        vec![MappingScope::Blame]
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {

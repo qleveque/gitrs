@@ -117,8 +117,8 @@ impl GitApp for StashApp {
         self.highlight_search(frame, rect);
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
-        vec![(MappingScope::Stash, true)]
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+        vec![MappingScope::Stash]
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {

@@ -42,7 +42,7 @@ pub enum PagerCommand {
 
 pub struct PagerApp {
     state: AppState,
-    mapping_scopes: Vec<(MappingScope, bool)>,
+    mapping_scopes: Vec<MappingScope>,
     lines: Arc<Mutex<Vec<String>>>,
     log_style: LogStyle,
     loaded: Arc<AtomicBool>,
@@ -59,7 +59,7 @@ impl PagerApp {
     pub fn new(pager_command: Option<PagerCommand>) -> Result<Self, Error> {
         let state = AppState::new()?;
         let git_exe = state.config.git_exe.clone();
-        let mut mapping_scopes = vec![(MappingScope::Pager, true)];
+        let mut mapping_scopes = vec![MappingScope::Pager];
         let mut iterator = match pager_command {
             Some(pager_command) => {
                 let (git_command, args, scope) = match pager_command {
@@ -67,7 +67,7 @@ impl PagerApp {
                     PagerCommand::Show(args) => ("show", args, MappingScope::Show),
                     PagerCommand::Reflog(args) => ("reflog", args, MappingScope::Reflog),
                 };
-                mapping_scopes.push((scope, true));
+                mapping_scopes.push(scope);
                 let bufreader: BufReader<ChildStdout> =
                     git_pager_output(git_command, git_exe, args)?;
                 Input::Command(bufreader.lines())
@@ -292,7 +292,7 @@ impl GitApp for PagerApp {
         self.highlight_search(frame, rect);
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<(MappingScope, bool)> {
+    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
         self.mapping_scopes.clone()
     }
 
