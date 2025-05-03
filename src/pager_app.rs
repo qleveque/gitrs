@@ -31,12 +31,14 @@ struct PagerAppViewModel {
 pub enum LogStyle {
     Standard,
     OneLine,
+    Diff,
 }
 
 pub enum PagerCommand {
     Log(Vec<String>),
     Show(Vec<String>),
     Reflog(Vec<String>),
+    Diff(Vec<String>),
 }
 
 pub struct PagerApp {
@@ -67,8 +69,9 @@ impl PagerApp {
                     PagerCommand::Log(args) => ("log", args, MappingScope::Log),
                     PagerCommand::Show(args) => ("show", args, MappingScope::Show),
                     PagerCommand::Reflog(args) => ("reflog", args, MappingScope::Reflog),
+                    PagerCommand::Diff(args) => ("diff", args, MappingScope::Diff),
                 };
-                mapping_scopes.push(scope);
+                mapping_scopes.insert(0, scope);
                 let bufreader: BufReader<ChildStdout> =
                     git_pager_output(git_command, git_exe, args)?;
                 Input::Command(bufreader.lines())
@@ -84,7 +87,7 @@ impl PagerApp {
                 lines.next()
             }
         }
-        .ok_or_else(|| Error::GitParsingError)??
+        .ok_or_else(|| Error::GlobalError("no data provided to the pager".to_string()))??
         .replace("\t", "    ")
         .replace("\r", "^M");
 
@@ -95,6 +98,7 @@ impl PagerApp {
         // Hopefully this is enough
         let log_style = match words.next().unwrap_or("") {
             "commit" => LogStyle::Standard,
+            "diff" => LogStyle::Diff,
             "*" => {
                 graph = true;
                 match words.next().unwrap_or("") {
@@ -239,6 +243,9 @@ impl PagerApp {
                     return Some(commit.to_string());
                 }
             }
+            LogStyle::Diff => {
+                return None;
+            }
         }
         return None;
     }
@@ -296,34 +303,39 @@ impl GitApp for PagerApp {
         let mut idx = self.idx()?;
         let mut file = None;
         let mut line_number = None;
+
+        // Test if current line describes a file
+        if self.log_style == LogStyle::Standard {
+            let idx = self.idx()?;
+            let mut line = self
+                .get_stripped_line(idx)
+                .map_err(|_| Error::GitParsingError)?;
+            self.remove_graph_symbols(&mut line);
+            let stat_re = Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)").unwrap();
+            if Path::new(&line).is_file() {
+                file = Some(line);
+            } else if let Some(caps) = stat_re.captures(&line) {
+                file = match caps.name("file") {
+                    None => None,
+                    Some(file) => Some(file.as_str().trim().to_string()),
+                }
+            }
+        }
+
         loop {
             let line = self
                 .get_stripped_line(idx)
                 .map_err(|_| Error::GitParsingError)?;
             if file.is_none() {
                 file = self.get_line_file(line.clone());
+                if file.is_some() && self.log_style == LogStyle::Diff {
+                    return Ok((file, None, line_number));
+                }
             }
             if line_number.is_none() {
                 line_number = self.get_line_line_number(line.clone());
             }
             if let Some(commit) = self.get_line_commit(line) {
-                if file.is_none() && self.log_style == LogStyle::Standard {
-                    // try to assess file on current line
-                    let idx = self.idx()?;
-                    let mut line = self
-                        .get_stripped_line(idx)
-                        .map_err(|_| Error::GitParsingError)?;
-                    self.remove_graph_symbols(&mut line);
-                    let stat_re = Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)").unwrap();
-                    if Path::new(&line).is_file() {
-                        file = Some(line);
-                    } else if let Some(caps) = stat_re.captures(&line) {
-                        file = match caps.name("file") {
-                            None => None,
-                            Some(file) => Some(file.as_str().trim().to_string()),
-                        }
-                    }
-                }
                 return Ok((file, Some(commit), line_number));
             }
             if idx == 0 {

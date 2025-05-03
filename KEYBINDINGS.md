@@ -21,7 +21,7 @@
 | | <kbd>yc</kbd> | Yank commit hash |
 | | <kbd>yf</kbd> | Yank file path |
 | | <kbd>yy</kbd> | Yank text |
-| Log, Show, Reflog | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
+| Log, Show, Reflog, Diff | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>c</kbd> | Next commit |
 | | <kbd>C</kbd> | Previous commit |
 | | <kbd>!r</kbd> | Interactive rebase on commit |
