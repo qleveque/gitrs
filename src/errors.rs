@@ -12,6 +12,8 @@ pub enum Error {
     ParseUtf8Error(#[from] FromUtf8Error),
     #[error("unable to set variable `{0}`")]
     ParseVariableError(String),
+    #[error("unable to parse button `{0}`")]
+    ParseButtonError(String),
     #[error("invalid state index")]
     StateIndexError,
     #[error("reached last match")]

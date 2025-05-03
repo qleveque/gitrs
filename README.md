@@ -62,29 +62,9 @@ button <scope> <text> <action>
 set <option> <value>
 ```
 
-#### Scopes
+### Actions
 
-* `global`
-* `files[:(new|modified|deleted|conflicted)]`
-* `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
-* `pager` `show` `log` `reflog`
-* `blame`
-* `stash`
-
-#### Options
-
-| Option | Description | Default | Type |
-|:---|:---|:---|:---|
-| `git` | Path to Git executable (useful for WSL: `git.exe`) | `"git"` | string |
-| `clipboard` | Clipboard utility to use | `"clip.exe"` on Windows and `"xsel"` on Linux | string |
-| `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
-| `scroll_step` | Number of lines per scroll step | `2` | `usize` |
-| `smart_case` | Use smart case | `true` | `false \| true` |
-| `menu_bar` | Show the menu bar | `true` | `false \| true` |
-| `default_config` | Load the default configuration | `true` | `false \| true` |
-
-#### Actions
-
+By default, an action can be ran at runtime by pressing `:` and then typing the desired action.
 An action can be a:
 
 - **Shell command**:
@@ -100,12 +80,36 @@ An action can be a:
         * `%(clip)` by the clipboard utility
 - **Builtin command**:
     - Navigation: `up`, `down`, `first`, `last`, `shift_line_middle`, `shift_line_top`, `shift_line_bottom`
+    - Go to specific line: `goto [line]`, `:<line>`
+    - Config: `map <scope> <keys> <action>`, `button <scope> <text> <action>`, `set <option> <value>`
     - Search: `search`, `search_reverse`, `next_search_result`, `previous_search_result`
     - Status specific: `status_switch_view`, `stage_unstage_file`, `stage_unstage_files`
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
     - Log specific: `pager_next_commit`, `pager_previous_commit`
     - Stash specific: `stash_drop`, `stash_apply`, `stash_pop`
-    - Others: `nop`, `reload`, `quit`, `open_files_app`, `open_show_app`
+    - Others: `nop`, `echo`, `reload`, `quit`, `open_files_app`, `open_show_app`
+
+### Scopes
+
+* `global`
+* `files[:(new|modified|deleted)]`
+* `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
+* `pager` `show` `log` `reflog`
+* `blame`
+* `stash`
+
+### Options
+
+| Option | Description | Default | Type |
+|:---|:---|:---|:---|
+| `git` | Path to Git executable (useful for WSL: `git.exe`) | `"git"` | string |
+| `clipboard` | Clipboard utility to use | `"clip.exe"` on Windows and `"xsel"` on Linux | string |
+| `scrolloff` | Number of lines to keep above/below cursor | `5` | usize |
+| `scroll_step` | Number of lines per scroll step | `2` | `usize` |
+| `smart_case` | Use smart case | `true` | `false \| true` |
+| `menu_bar` | Show the menu bar | `true` | `false \| true` |
+| `default_mappings` | Load the default mappings | `true` | `false \| true` |
+| `default_buttons` | Load the default buttons | `true` | `false \| true` |
 
 ---
 

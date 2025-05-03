@@ -207,10 +207,11 @@ impl GitApp for FilesApp {
     fn on_click(&mut self) {
         if self.view_model.rect.contains(self.state.mouse_position) {
             let delta = (self.state.mouse_position.y - self.view_model.rect.y) as usize;
-            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+            self.state
+                .list_state
+                .select(Some(self.state.list_state.offset() + delta));
         }
     }
-
 
     fn on_scroll(&mut self, down: bool) {
         self.standard_on_scroll(

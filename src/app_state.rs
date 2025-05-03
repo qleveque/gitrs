@@ -1,14 +1,20 @@
 use std::collections::HashMap;
 
-use ratatui::{layout::{Position, Rect}, widgets::ListState};
+use ratatui::{
+    layout::{Position, Rect},
+    widgets::ListState,
+};
 
 use crate::{
-    action::Action, config::{parse_gitrs_config, Config}, errors::Error
+    action::Action,
+    config::{parse_gitrs_config, Config},
+    errors::Error,
 };
 
 #[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum NotifChannel {
     Search,
+    Echo,
     Line,
     Keys,
     Error,

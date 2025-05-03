@@ -9,12 +9,17 @@ use crate::{
     app_state::NotifChannel,
     config::{Button, MappingScope},
     pager_app::{PagerApp, PagerCommand},
-    ui::{bar_style, button_style, clicked_button_style, hovered_button_style, search_highlight_style},
+    ui::{
+        bar_style, button_style, clicked_button_style, hovered_button_style, search_highlight_style,
+    },
 };
 use regex::{Regex, RegexBuilder};
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        KeyModifiers, MouseButton, MouseEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -166,11 +171,11 @@ pub trait GitApp {
             self.get_mapping_fields().as_slice(),
             &[MappingScope::Global],
         ]
-        .concat().iter().rev()
+        .concat()
+        .iter()
+        .rev()
         {
-            if let Some(new_buttons) = self.state().config.buttons.get(&field) {
-                buttons.extend(new_buttons.clone());
-            }
+            buttons.extend(self.state().config.get_buttons(field.clone()));
         }
 
         let chunks = Layout::default()
@@ -188,7 +193,6 @@ pub trait GitApp {
             .constraints(constraints)
             .direction(Direction::Horizontal)
             .split(chunks[0]);
-
 
         let paragraph = Paragraph::default().style(bar_style());
         Widget::render(&paragraph, chunks[0], frame.buffer_mut());
@@ -284,7 +288,8 @@ pub trait GitApp {
         let mut notif_vec: Vec<_> = self.state().notif.iter().collect();
         notif_vec.sort_by_key(|(notif_channel, _)| *notif_channel);
 
-        let lines: Vec<Line> = notif_vec.into_iter()
+        let lines: Vec<Line> = notif_vec
+            .into_iter()
             .map(|(notif_channel, message)| {
                 let line_style = match notif_channel {
                     NotifChannel::Error => Style::from(Color::Red),
@@ -295,7 +300,7 @@ pub trait GitApp {
                     NotifChannel::Search => {
                         message.push(' ');
                         message.push(loading_char);
-                    },
+                    }
                     NotifChannel::Line if !loaded => {
                         message.push_str("... ");
                         message.push(loading_char);
@@ -305,8 +310,7 @@ pub trait GitApp {
                 Line::styled(message.to_string(), line_style)
             })
             .collect();
-        let paragraph = Paragraph::new(Text::from(lines))
-            .style(bar_style());
+        let paragraph = Paragraph::new(Text::from(lines)).style(bar_style());
 
         let len = self.state().notif.len() as u16;
         let chunks = Layout::default()
@@ -379,7 +383,6 @@ pub trait GitApp {
 
         Ok(())
     }
-
 
     fn cancel_input(&mut self) {
         let input_state = self.state().input_state.clone();
@@ -466,8 +469,6 @@ pub trait GitApp {
             return Ok(None);
         }
 
-        let bindings = self.state().config.bindings.clone();
-
         let mut potential = false;
         for field in [
             self.get_mapping_fields().as_slice(),
@@ -475,15 +476,16 @@ pub trait GitApp {
         ]
         .concat()
         {
-            if let Some(mode_hotkeys) = bindings.get(&field) {
-                for (key_combination, action) in mode_hotkeys {
-                    if *key_combination == keys {
-                        self.state().key_combination.clear();
-                        return Ok(Some(action.clone()));
-                    }
-                    if key_combination.starts_with(&keys) {
-                        potential = true;
-                    }
+            for (key_combination, action) in self.state().config.get_bindings(field) {
+                if action == Action::None {
+                    continue;
+                }
+                if *key_combination == keys {
+                    self.state().key_combination.clear();
+                    return Ok(Some(action.clone()));
+                }
+                if key_combination.starts_with(&keys) {
+                    potential = true;
                 }
             }
         }
@@ -553,6 +555,10 @@ pub trait GitApp {
             Action::PreviousSearchResult => self.search_result(true)?,
             Action::GoTo(line) => self.state().list_state.select(Some(*line)),
             Action::None => (),
+            Action::Echo(message) => self.notif(NotifChannel::Echo, format!("echo: {}", message)),
+            Action::Map(line) => self.state().config.parse_map_line(line, false)?,
+            Action::Set(line) => self.state().config.parse_set_line(line)?,
+            Action::Button(line) => self.state().config.parse_button_line(line, false)?,
             Action::OpenFilesApp | Action::OpenShowApp => {
                 let (_, rev, _) = self.get_file_rev_line()?;
                 if let Some(rev) = rev {
@@ -589,9 +595,10 @@ pub trait GitApp {
                     } else {
                         Ok(self.handle_line_edited(key_event)?)
                     };
-                },
+                }
                 Event::Mouse(mouse_event) => {
-                    self.state().mouse_position = Position::new(mouse_event.column, mouse_event.row);
+                    self.state().mouse_position =
+                        Position::new(mouse_event.column, mouse_event.row);
                     match mouse_event.kind {
                         MouseEventKind::Down(mouse_button) => {
                             // for the time being, cancel line inputs
@@ -599,33 +606,27 @@ pub trait GitApp {
                             self.state().notif = HashMap::new();
                             self.state().mouse_down = true;
                             return Ok(self.handle_click_event(mouse_button)?);
-                        },
+                        }
                         MouseEventKind::Up(_) => {
                             self.state().mouse_down = false;
-                        },
+                        }
                         MouseEventKind::ScrollUp => {
                             self.on_scroll(false);
-                        },
+                        }
                         MouseEventKind::ScrollDown => {
                             self.on_scroll(true);
-                        },
+                        }
                         _ => (),
                     };
-                },
-                _ => ()
+                }
+                _ => (),
             }
         }
         return Ok(None);
     }
 
-
     fn on_scroll(&mut self, down: bool);
-    fn standard_on_scroll(
-        &mut self,
-        down: bool,
-        height: usize,
-        len: usize
-    ) {
+    fn standard_on_scroll(&mut self, down: bool, height: usize, len: usize) {
         let scroll_step = self.get_state().config.scroll_step;
         let scrolloff = self.get_state().config.scrolloff;
         let mut index = self.idx().unwrap_or(0);
@@ -633,11 +634,13 @@ pub trait GitApp {
         let offset = self.state().list_state.offset_mut();
         match down {
             true => *offset += scroll_step,
-            false => if *offset > scroll_step {
-                *offset -= scroll_step
-            } else {
-                *offset = 0
-            },
+            false => {
+                if *offset > scroll_step {
+                    *offset -= scroll_step
+                } else {
+                    *offset = 0
+                }
+            }
         };
 
         if *offset + scrolloff >= index {
@@ -664,12 +667,8 @@ pub trait GitApp {
 
         let mapping = match mouse_button {
             MouseButton::Right => "<rclick>",
-            _ => {
-                return Ok(None)
-            },
+            _ => return Ok(None),
         };
-
-        let bindings = self.state().config.bindings.clone();
 
         for field in [
             self.get_mapping_fields().as_slice(),
@@ -677,11 +676,9 @@ pub trait GitApp {
         ]
         .concat()
         {
-            if let Some(mode_hotkeys) = bindings.get(&field) {
-                for (key_combination, action) in mode_hotkeys {
-                    if key_combination == mapping {
-                        return Ok(Some(action.clone()));
-                    }
+            for (key_combination, action) in self.state().config.get_bindings(field) {
+                if key_combination == mapping {
+                    return Ok(Some(action.clone()));
                 }
             }
         }
@@ -722,10 +719,16 @@ pub trait GitApp {
         let shell = ("cmd", "/C");
 
         #[cfg(unix)]
-        let command = format!(r#"{} || (echo "Command failed. Press enter to continue..."; read)"#, command);
+        let command = format!(
+            r#"{} || (echo "Command failed. Press enter to continue..."; read)"#,
+            command
+        );
 
         #[cfg(windows)]
-        let command = format!(r#"{} || (echo Command failed. Press enter to continue... && pause)"#, command);
+        let command = format!(
+            r#"{} || (echo Command failed. Press enter to continue... && pause)"#,
+            command
+        );
 
         let mut bash_proc = Command::new(shell.0);
         let proc = bash_proc.args([shell.1, &command]);

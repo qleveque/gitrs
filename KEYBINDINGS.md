@@ -18,7 +18,6 @@
 | | <kbd>n</kbd> | Next search result |
 | | <kbd>N</kbd> | Previous search result |
 | | <kbd>s</kbd> | Open show view |
-| | <kbd>d</kbd> | Git difftool on current rev and file |
 | | <kbd>yc</kbd> | Yank commit hash |
 | | <kbd>yf</kbd> | Yank file path |
 | | <kbd>yy</kbd> | Yank text |
@@ -26,10 +25,12 @@
 | | <kbd>c</kbd> | Next commit |
 | | <kbd>C</kbd> | Previous commit |
 | | <kbd>!r</kbd> | Interactive rebase on commit |
+| | <kbd>d</kbd> | Git difftool |
 | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
 | | <kbd>h</kbd>/<kbd>←</kbd> | Previous blame commit |
+| | <kbd>d</kbd> | Git difftool |
 | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>!a</kbd> | Apply stash |
 | | <kbd>!p</kbd> | Pop stash |
@@ -47,4 +48,4 @@
 | | <kbd>!p</kbd> | Push |
 | | <kbd>!P</kbd> | Force push |
 | | <kbd>!r</kbd> | Restore file / Remove file |
-| | <kbd>d</kbd> | Difftool on file |
+| | <kbd>d</kbd> | Git difftool |

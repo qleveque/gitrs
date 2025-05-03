@@ -43,6 +43,10 @@ pub enum Action {
     StashPop,
     StashApply,
     StashDrop,
+    Echo(String),
+    Set(String),
+    Map(String),
+    Button(String),
     None,
 }
 
@@ -50,7 +54,10 @@ impl FromStr for Action {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        let mut split = s.splitn(2, ' ');
+        let key = split.next().unwrap_or("");
+        let parameters = split.next().unwrap_or("");
+        match key {
             "up" => Ok(Action::Up),
             "down" => Ok(Action::Down),
             "reload" => Ok(Action::Reload),
@@ -81,21 +88,33 @@ impl FromStr for Action {
             "stash_pop" => Ok(Action::StashPop),
             "stash_apply" => Ok(Action::StashApply),
             "stash_drop" => Ok(Action::StashDrop),
+            "echo" => Ok(Action::Echo(parameters.to_string())),
+            "set" => Ok(Action::Set(parameters.to_string())),
+            "map" => Ok(Action::Map(parameters.to_string())),
+            "button" => Ok(Action::Button(parameters.to_string())),
             "nop" => Ok(Action::None),
-            cmd => {
-                if let Ok(number) = cmd.parse::<usize>() {
+            "goto" => {
+                if let Ok(number) = parameters.parse::<usize>() {
+                    if number > 0 {
+                        return Ok(Action::GoTo(number - 1));
+                    }
+                };
+                return Ok(Action::GoTo(0));
+            },
+            _ => {
+                if let Ok(number) = s.parse::<usize>() {
                     if number > 0 {
                         return Ok(Action::GoTo(number - 1));
                     }
                 }
-                let command_type = match cmd.chars().next() {
+                let command_type = match s.chars().next() {
                     Some('!') => CommandType::Sync,
                     Some('>') => CommandType::SyncQuit,
                     Some('@') => CommandType::Async,
-                    _ => return Err(Error::ParseActionError(cmd.to_string())),
+                    _ => return Err(Error::ParseActionError(s.to_string())),
                 };
 
-                Ok(Action::Command(command_type, cmd[1..].to_string()))
+                Ok(Action::Command(command_type, s[1..].to_string()))
             }
         }
     }

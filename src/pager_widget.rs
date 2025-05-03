@@ -22,7 +22,7 @@ pub fn adapt_index_in_frame(
     scrolloff: usize,
     mut index: usize,
     height: usize,
-    len: usize
+    len: usize,
 ) -> usize {
     if offset + scrolloff >= index {
         index = offset + scrolloff;
@@ -42,7 +42,7 @@ impl PagerWidget {
         height: usize,
         app_state: &mut AppState,
         scroll: Option<bool>,
-        scroll_step : usize,
+        scroll_step: usize,
     ) -> Self {
         let scrolloff = app_state.config.scrolloff;
 
@@ -77,7 +77,7 @@ impl PagerWidget {
                         0
                     }
                 }
-            },
+            }
             Some(down) => {
                 match down {
                     true => {
@@ -85,21 +85,20 @@ impl PagerWidget {
                         if items.len() >= scrolloff + 1 && offset >= items.len() - scrolloff - 1 {
                             offset = items.len() - scrolloff - 1
                         }
-                    },
+                    }
                     false => {
                         if offset < scroll_step {
                             offset = 0;
                         } else {
                             offset = offset - scroll_step;
                         }
-                    },
+                    }
                 };
                 index = adapt_index_in_frame(offset, scrolloff, index, height, items.len());
             }
         }
         *app_state.list_state.offset_mut() = offset;
         app_state.list_state.select(Some(index));
-
 
         let first = app_state.list_state.offset();
         let last = min(first + height, items.len());

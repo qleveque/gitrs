@@ -199,13 +199,17 @@ impl GitApp for StatusApp {
             self.staged_status = StagedStatus::Unstaged;
             let delta = (self.state.mouse_position.y - self.top_rect.y) as usize;
             if delta > 0 {
-                self.state.list_state.select(Some(self.state.list_state.offset() + delta - 1));
+                self.state
+                    .list_state
+                    .select(Some(self.state.list_state.offset() + delta - 1));
             }
         } else if self.bottom_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Staged;
             let delta = (self.state.mouse_position.y - self.bottom_rect.y) as usize;
             if delta > 0 {
-                self.state.list_state.select(Some(self.state.list_state.offset() + delta - 1));
+                self.state
+                    .list_state
+                    .select(Some(self.state.list_state.offset() + delta - 1));
             }
         }
     }
@@ -336,11 +340,7 @@ impl GitApp for StatusApp {
             StagedStatus::Staged => self.bottom_rect,
         };
         let table = self.get_current_table();
-        self.standard_on_scroll(
-            down,
-            rect.height as usize,
-            table.len(),
-        );
+        self.standard_on_scroll(down, rect.height as usize, table.len());
     }
 
     fn run_action(

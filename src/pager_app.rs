@@ -380,7 +380,9 @@ impl GitApp for PagerApp {
         let rect = self.view_model.rect;
         if rect.contains(self.state.mouse_position) {
             let delta = (self.state.mouse_position.y - rect.y) as usize;
-            self.state.list_state.select(Some(self.state.list_state.offset() + delta));
+            self.state
+                .list_state
+                .select(Some(self.state.list_state.offset() + delta));
         }
     }
 }

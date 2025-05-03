@@ -2,7 +2,8 @@ use std::{
     collections::HashMap,
     env,
     io::{BufRead, BufReader},
-    process::{exit, ChildStdout, Command, Stdio}, str::FromStr,
+    process::{exit, ChildStdout, Command, Stdio},
+    str::FromStr,
 };
 
 use crate::{config::Config, errors::Error};
@@ -62,7 +63,6 @@ impl FromStr for StagedStatus {
         }
     }
 }
-
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum GitOp {
