@@ -254,7 +254,13 @@ impl PagerApp {
                 }
             }
             LogStyle::Diff => {
-                return None;
+                let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
+                if first == "index" {
+                    let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
+                    if !commit.is_empty() {
+                        return Some(commit.to_string());
+                    }
+                }
             }
         }
         return None;
@@ -312,6 +318,7 @@ impl GitApp for PagerApp {
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
         let mut idx = self.idx()?;
         let mut file = None;
+        let mut commit = None;
         let mut line_number = None;
 
         // Test if current line describes a file
@@ -337,16 +344,21 @@ impl GitApp for PagerApp {
                 .get_stripped_line(idx)
                 .map_err(|_| Error::GitParsingError)?;
             if file.is_none() {
-                file = self.get_line_file(line.clone());
-                if file.is_some() && self.log_style == LogStyle::Diff {
-                    return Ok((file, None, line_number));
+                if let Some(line_file) = self.get_line_file(line.clone()) {
+                    file = Some(line_file);
+                    if self.log_style == LogStyle::Diff {
+                        break;
+                    }
                 }
             }
             if line_number.is_none() {
                 line_number = self.get_line_line_number(line.clone());
             }
-            if let Some(commit) = self.get_line_commit(line) {
-                return Ok((file, Some(commit), line_number));
+            if let Some(line_commit) = self.get_line_commit(line) {
+                commit = Some(line_commit);
+                if self.log_style != LogStyle::Diff {
+                    break;
+                }
             }
             if idx == 0 {
                 break;
@@ -354,7 +366,7 @@ impl GitApp for PagerApp {
                 idx -= 1;
             }
         }
-        Ok((None, None, None))
+        Ok((file, commit, line_number))
     }
 
     fn run_action(
