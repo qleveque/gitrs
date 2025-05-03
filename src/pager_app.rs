@@ -1,4 +1,5 @@
 use std::io::{BufRead, BufReader, Lines};
+use std::path::Path;
 use std::process::ChildStdout;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,6 +19,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::Clear;
 use ratatui::Frame;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use regex::Regex;
 
 struct PagerAppViewModel {
     list: PagerWidget,
@@ -292,20 +294,37 @@ impl GitApp for PagerApp {
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
         let mut idx = self.idx()?;
-        let mut rfile = None;
-        let mut rline = None;
+        let mut file = None;
+        let mut line_number = None;
         loop {
             let line = self
                 .get_stripped_line(idx)
-                .map_err(|_| Error::ReachedLastMachted)?;
-            if rfile.is_none() {
-                rfile = self.get_line_file(line.clone());
+                .map_err(|_| Error::GitParsingError)?;
+            if file.is_none() {
+                file = self.get_line_file(line.clone());
             }
-            if rline.is_none() {
-                rline = self.get_line_line_number(line.clone());
+            if line_number.is_none() {
+                line_number = self.get_line_line_number(line.clone());
             }
             if let Some(commit) = self.get_line_commit(line) {
-                return Ok((rfile, Some(commit), rline));
+                if file.is_none() && self.log_style == LogStyle::Standard {
+                    // try to assess file on current line
+                    let idx = self.idx()?;
+                    let mut line = self
+                        .get_stripped_line(idx)
+                        .map_err(|_| Error::GitParsingError)?;
+                    self.remove_graph_symbols(&mut line);
+                    let stat_re = Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)").unwrap();
+                    if Path::new(&line).is_file() {
+                        file = Some(line);
+                    } else if let Some(caps) = stat_re.captures(&line) {
+                        file = match caps.name("file") {
+                            None => None,
+                            Some(file) => Some(file.as_str().trim().to_string()),
+                        }
+                    }
+                }
+                return Ok((file, Some(commit), line_number));
             }
             if idx == 0 {
                 break;
