@@ -126,16 +126,19 @@ fn list_to_draw<'a>(
         .scroll_padding(config.scrolloff);
 }
 
+#[derive(Default)]
+pub struct StatusAppViewModel {
+    top_rect: Rect,
+    bottom_rect: Rect,
+}
+
 pub struct StatusApp {
     state: AppState,
     staged_status: StagedStatus,
     unstaged_table: Vec<(FileStatus, String)>,
     staged_table: Vec<(FileStatus, String)>,
     git_files: HashMap<String, GitFile>,
-    height: usize,
-    default_state: ListState,
-    top_rect: Rect,
-    bottom_rect: Rect,
+    view_model: StatusAppViewModel,
 }
 
 impl StatusApp {
@@ -148,10 +151,7 @@ impl StatusApp {
             unstaged_table: Vec::new(),
             staged_table: Vec::new(),
             git_files: HashMap::new(),
-            height: 0,
-            default_state: ListState::default(),
-            top_rect: Rect::default(),
-            bottom_rect: Rect::default(),
+            view_model: StatusAppViewModel::default(),
         };
         instance.reload()?;
         Ok(instance)
@@ -195,17 +195,17 @@ impl GitApp for StatusApp {
     }
 
     fn on_click(&mut self) {
-        if self.top_rect.contains(self.state.mouse_position) {
+        if self.view_model.top_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Unstaged;
-            let delta = (self.state.mouse_position.y - self.top_rect.y) as usize;
+            let delta = (self.state.mouse_position.y - self.view_model.top_rect.y) as usize;
             if delta > 0 {
                 self.state
                     .list_state
                     .select(Some(self.state.list_state.offset() + delta - 1));
             }
-        } else if self.bottom_rect.contains(self.state.mouse_position) {
+        } else if self.view_model.bottom_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Staged;
-            let delta = (self.state.mouse_position.y - self.bottom_rect.y) as usize;
+            let delta = (self.state.mouse_position.y - self.view_model.bottom_rect.y) as usize;
             if delta > 0 {
                 self.state
                     .list_state
@@ -241,8 +241,6 @@ impl GitApp for StatusApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        self.height = rect.height as usize;
-
         if self.tables_are_empty() {
             let paragraph = Paragraph::new("Nothing to commit, working tree clean");
             frame.render_widget(paragraph, rect);
@@ -253,8 +251,8 @@ impl GitApp for StatusApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(rect);
-        self.top_rect = chunks[0];
-        self.bottom_rect = chunks[1];
+        self.view_model.top_rect = chunks[0];
+        self.view_model.bottom_rect = chunks[1];
 
         let top_list = list_to_draw(
             &self.unstaged_table,
@@ -263,13 +261,14 @@ impl GitApp for StatusApp {
             "Not staged:".to_string(),
             &self.state.config,
         );
+        let mut default = ListState::default();
         StatefulWidget::render(
             &top_list,
             chunks[0],
             frame.buffer_mut(),
             match self.staged_status {
                 StagedStatus::Unstaged => &mut self.state.list_state,
-                StagedStatus::Staged => &mut self.default_state,
+                StagedStatus::Staged => &mut default,
             },
         );
 
@@ -280,12 +279,13 @@ impl GitApp for StatusApp {
             "Staged:".to_string(),
             &self.state.config,
         );
+        let mut default = ListState::default();
         StatefulWidget::render(
             &bottom_list,
             chunks[1],
             frame.buffer_mut(),
             match self.staged_status {
-                StagedStatus::Unstaged => &mut self.default_state,
+                StagedStatus::Unstaged => &mut default,
                 StagedStatus::Staged => &mut self.state.list_state,
             },
         );
@@ -330,14 +330,14 @@ impl GitApp for StatusApp {
     }
 
     fn on_scroll(&mut self, down: bool) {
-        if self.top_rect.contains(self.state.mouse_position) {
+        if self.view_model.top_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Unstaged;
-        } else if self.bottom_rect.contains(self.state.mouse_position) {
+        } else if self.view_model.bottom_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Staged;
         };
         let rect = match self.staged_status {
-            StagedStatus::Unstaged => self.top_rect,
-            StagedStatus::Staged => self.bottom_rect,
+            StagedStatus::Unstaged => self.view_model.top_rect,
+            StagedStatus::Staged => self.view_model.bottom_rect,
         };
         let table = self.get_current_table();
         self.standard_on_scroll(down, rect.height as usize, table.len());
@@ -398,7 +398,11 @@ impl GitApp for StatusApp {
                 if matches!(action, Action::Command(_, _)) {
                     git_add_restore(&mut self.git_files, &self.state.config);
                 }
-                self.run_generic_action(action, self.height, terminal)?;
+                let rect = match self.staged_status {
+                    StagedStatus::Unstaged => self.view_model.top_rect,
+                    StagedStatus::Staged => self.view_model.bottom_rect,
+                };
+                self.run_generic_action(action, rect.height as usize, terminal)?;
             }
         }
         if !self.tables_are_empty() && 0 == self.get_current_table().len() {

@@ -25,8 +25,7 @@ use std::env;
 struct FilesAppViewModel {
     file_list: List<'static>,
     commit_paragraph: Paragraph<'static>,
-    files_height: usize,
-    rect: Rect,
+    files_rect: Rect,
 }
 
 pub struct FilesApp {
@@ -57,8 +56,7 @@ impl FilesApp {
             view_model: FilesAppViewModel {
                 file_list: List::default(),
                 commit_paragraph: Paragraph::default(),
-                files_height: 0,
-                rect: Rect::default(),
+                files_rect: Rect::default(),
             },
         };
         r.reload()?;
@@ -158,8 +156,7 @@ impl GitApp for FilesApp {
             frame.buffer_mut(),
             &mut self.state.list_state,
         );
-        self.view_model.files_height = chunks[1].height as usize;
-        self.view_model.rect = chunks[1];
+        self.view_model.files_rect = chunks[1];
 
         self.highlight_search(
             frame,
@@ -200,13 +197,13 @@ impl GitApp for FilesApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        self.run_generic_action(action, self.view_model.files_height, terminal)?;
+        self.run_generic_action(action, self.view_model.files_rect.height as usize, terminal)?;
         return Ok(());
     }
 
     fn on_click(&mut self) {
-        if self.view_model.rect.contains(self.state.mouse_position) {
-            let delta = (self.state.mouse_position.y - self.view_model.rect.y) as usize;
+        if self.view_model.files_rect.contains(self.state.mouse_position) {
+            let delta = (self.state.mouse_position.y - self.view_model.files_rect.y) as usize;
             self.state
                 .list_state
                 .select(Some(self.state.list_state.offset() + delta));
@@ -216,7 +213,7 @@ impl GitApp for FilesApp {
     fn on_scroll(&mut self, down: bool) {
         self.standard_on_scroll(
             down,
-            self.view_model.rect.height as usize,
+            self.view_model.files_rect.height as usize,
             self.commit.files.len(),
         );
     }

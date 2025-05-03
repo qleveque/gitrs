@@ -29,7 +29,6 @@ use syntect::util::LinesWithEndings;
 use std::path::Path;
 
 struct BlameAppViewModel {
-    height: usize,
     blame_list: List<'static>,
     code_list: List<'static>,
     max_blame_len: usize,
@@ -63,7 +62,6 @@ impl<'a> BlameApp {
             code: Vec::new(),
             revisions,
             view_model: BlameAppViewModel {
-                height: 0,
                 blame_list: List::default(),
                 code_list: List::default(),
                 max_blame_len: 0,
@@ -265,7 +263,6 @@ impl GitApp for BlameApp {
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
-        self.view_model.height = rect.height as usize;
         self.view_model.rect = rect;
 
         let chunks = Layout::default()
@@ -350,7 +347,7 @@ impl GitApp for BlameApp {
                 self.reload()?;
             }
             _ => {
-                self.run_generic_action(action, self.view_model.height, terminal)?;
+                self.run_generic_action(action, self.view_model.rect.height as usize, terminal)?;
                 return Ok(());
             }
         };

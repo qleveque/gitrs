@@ -10,4 +10,4 @@
 ☑ buttons
 ☐ properly parse patches in stash pager (line + file)
 ☐ format the git blame raw output for easier parsing
-☐ we no longer need height in view model with rect
+☑ we no longer need height in view model with rect

@@ -74,7 +74,7 @@ map pager <rclick> open_files_app
 map pager c pager_next_commit
 
 # | | <kbd>C</kbd> | Previous commit |
-map pager C previous_commit
+map pager C pager_previous_commit
 
 # | | <kbd>!r</kbd> | Interactive rebase on commit |
 map pager !r !%(git) rebase -i %(rev)^

@@ -21,7 +21,6 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 struct PagerAppViewModel {
     list: PagerWidget,
-    height: usize,
     rect: Rect,
     scroll: Option<bool>,
 }
@@ -157,7 +156,6 @@ impl PagerApp {
             original_dir,
             view_model: PagerAppViewModel {
                 list: PagerWidget::default(),
-                height: 0,
                 rect: Rect::default(),
                 scroll: None,
             },
@@ -280,13 +278,12 @@ impl GitApp for PagerApp {
         let scroll_step = self.state.config.scroll_step;
         self.view_model.list = PagerWidget::new(
             &self.lines.lock().unwrap(),
-            self.view_model.height,
+            rect.height as usize,
             &mut self.state,
             self.view_model.scroll,
             scroll_step,
         );
         self.view_model.scroll = None;
-        self.view_model.height = rect.height as usize;
         frame.render_widget(Clear, rect);
         self.view_model.list.render(rect, frame.buffer_mut());
         self.highlight_search(frame, rect);
@@ -360,7 +357,7 @@ impl GitApp for PagerApp {
                 *self.state.list_state.offset_mut() = self.idx()?;
             }
             action => {
-                self.run_generic_action(action, self.view_model.height, terminal)?;
+                self.run_generic_action(action, self.view_model.rect.height as usize, terminal)?;
             }
         }
         return Ok(());
