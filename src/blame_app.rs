@@ -1,10 +1,10 @@
 use crate::action::Action;
 use crate::app::GitApp;
-use crate::app_state::AppState;
+use crate::app_state::{AppState, NotifChannel};
 use crate::config::{Config, MappingScope};
 
 use crate::errors::Error;
-use crate::git::{git_blame_output, CommitRef};
+use crate::git::{get_previous_filename, git_blame_output, CommitRef};
 use crate::ui::{date_to_color, highlight_style};
 
 use ratatui::layout::Rect;
@@ -41,6 +41,7 @@ pub struct BlameApp {
     blames: Vec<Option<CommitRef>>,
     code: Vec<String>,
     revisions: Vec<Option<String>>,
+    files: Vec<String>,
     view_model: BlameAppViewModel,
 }
 
@@ -52,6 +53,7 @@ impl<'a> BlameApp {
             ));
         }
         let revisions = vec![revision];
+        let files = vec![file.clone()];
 
         let mut state = AppState::new()?;
         state.list_state.select(Some(line - 1));
@@ -61,6 +63,7 @@ impl<'a> BlameApp {
             blames: Vec::new(),
             code: Vec::new(),
             revisions,
+            files,
             view_model: BlameAppViewModel {
                 blame_list: List::default(),
                 code_list: List::default(),
@@ -70,6 +73,12 @@ impl<'a> BlameApp {
         };
         instance.reload()?;
         Ok(instance)
+    }
+
+    fn get_current_file(&self) -> Result<String, Error> {
+        Ok(self.files
+            .last()
+            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?.to_string())
     }
 
     fn highlighted_lines(&self) -> Result<Vec<Line<'a>>, Error> {
@@ -163,13 +172,13 @@ impl<'a> BlameApp {
             let (hash, _) = blame_text
                 .split_once(" ")
                 .ok_or_else(|| Error::GitParsingError)?;
-            let (_, blame_text) = blame_text
-                .split_once(" (")
-                .ok_or_else(|| Error::GitParsingError)?;
             // for initial commit
             blame_column.push(if hash.starts_with("0000") {
                 None
             } else {
+                let (_, blame_text) = blame_text
+                    .split_once(" (")
+                    .ok_or_else(|| Error::GitParsingError)?;
                 let metadata: Vec<&str> = blame_text.trim().split_whitespace().collect();
                 let author = metadata[..metadata.len() - 4].join(" ");
                 let date = metadata[metadata.len() - 4];
@@ -203,10 +212,13 @@ impl GitApp for BlameApp {
             .revisions
             .last()
             .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?;
+        let file = self.get_current_file()?;
+
         let (new_blames, new_code) =
-            BlameApp::parse_git_blame(self.file.clone(), revision.clone(), &self.state.config)?;
+            BlameApp::parse_git_blame(file.clone(), revision.clone(), &self.state.config)?;
         if new_blames.len() == 0 {
             self.revisions.pop();
+            self.files.pop();
             return Ok(());
         }
         self.blames = new_blames;
@@ -296,6 +308,18 @@ impl GitApp for BlameApp {
                 height: chunks[1].height,
             },
         );
+
+        if let Ok(file) = self.get_current_file() {
+            self.notif(
+                NotifChannel::Line,
+                format!(
+                    "{} - line {} of {}",
+                    file,
+                    self.idx().unwrap_or(0) + 1,
+                    self.blames.len(),
+                )
+            );
+        }
     }
 
     fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
@@ -316,7 +340,8 @@ impl GitApp for BlameApp {
             }
             None => None,
         };
-        Ok((Some(self.file.clone()), rev, Some(idx + 1)))
+        let file = self.get_current_file()?;
+        Ok((Some(file.clone()), rev, Some(idx + 1)))
     }
 
     fn run_action(
@@ -330,20 +355,25 @@ impl GitApp for BlameApp {
                     return Ok(());
                 }
                 self.revisions.pop();
+                self.files.pop();
                 self.reload()?;
             }
             Action::PreviousCommitBlame => {
                 let idx = self.idx()?;
                 let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
-                let rev = if let Some(commit) = commit_ref {
+                let file = self.get_current_file()?;
+                let (rev, prev_file) = if let Some(commit) = commit_ref {
                     if let Some('^') = commit.hash.chars().next() {
                         return Ok(());
                     }
-                    format!("{}^", commit.hash)
+                    let rev = format!("{}^", commit.hash);
+                    let prev_file = get_previous_filename(&commit.hash, &file)?;
+                    (rev, prev_file.to_string())
                 } else {
-                    "HEAD".to_string()
+                    ("HEAD".to_string(), file.clone())
                 };
                 self.revisions.push(Some(rev.clone()));
+                self.files.push(prev_file.clone());
                 self.reload()?;
             }
             _ => {

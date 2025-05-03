@@ -341,3 +341,29 @@ pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
         git_file.reinit();
     }
 }
+
+// Done by chatgpt
+pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String, Error> {
+    // Run: git diff --name-status rev^ rev
+    let output = Command::new("git")
+        .args(["diff", "--name-status", &format!("{rev}^"), rev])
+        .output()?;
+
+    if !output.status.success() {
+        return Err(Error::GlobalError("git diff command failed".to_string()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        // Look for rename lines like: R100    old_name    new_name
+        if line.starts_with('R') {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() == 3 && parts[2] == current_filename {
+                return Ok(parts[1].to_string());
+            }
+        }
+    }
+
+    // No rename found; return the same name
+    Ok(current_filename.to_string())
+}
