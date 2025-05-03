@@ -28,9 +28,7 @@ struct PagerAppViewModel {
 #[derive(PartialEq, Debug)]
 pub enum LogStyle {
     Standard,
-    StandardGraph,
     OneLine,
-    OneLineGraph,
 }
 
 pub enum PagerCommand {
@@ -46,6 +44,7 @@ pub struct PagerApp {
     log_style: LogStyle,
     loaded: Arc<AtomicBool>,
     original_dir: std::path::PathBuf,
+    graph: bool,
     view_model: PagerAppViewModel,
 }
 
@@ -59,6 +58,7 @@ impl PagerApp {
         let state = AppState::new()?;
         let git_exe = state.config.git_exe.clone();
         let mut mapping_scopes = vec![MappingScope::Pager];
+        let mut graph = false;
         let mut iterator = match pager_command {
             Some(pager_command) => {
                 let (git_command, args, scope) = match pager_command {
@@ -89,19 +89,15 @@ impl PagerApp {
         let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
         let first_line = String::from_utf8(bytes)?;
 
-        let (first_word, other_words) = first_line
-            .split_once(' ')
-            .ok_or_else(|| Error::GitParsingError)?;
+        let mut words = first_line.split(' ');
         // Hopefully this is enough
-        let log_style = match first_word {
+        let log_style = match words.next().unwrap_or("") {
             "commit" => LogStyle::Standard,
             "*" => {
-                let (second_word, _) = other_words
-                    .split_once(' ')
-                    .ok_or_else(|| Error::GitParsingError)?;
-                match second_word {
-                    "commit" => LogStyle::StandardGraph,
-                    _ => LogStyle::OneLineGraph,
+                graph = true;
+                match words.next().unwrap_or("") {
+                    "commit" => LogStyle::Standard,
+                    _ => LogStyle::OneLine,
                 }
             }
             _ => LogStyle::OneLine,
@@ -154,6 +150,7 @@ impl PagerApp {
             log_style,
             loaded,
             original_dir,
+            graph,
             view_model: PagerAppViewModel {
                 list: PagerWidget::default(),
                 rect: Rect::default(),
@@ -179,7 +176,7 @@ impl PagerApp {
 
     fn remove_graph_symbols(&self, line: &mut String) {
         // remove | and * graph chars
-        if self.log_style == LogStyle::StandardGraph || self.log_style == LogStyle::OneLineGraph {
+        if self.graph {
             loop {
                 if let Some(first_char) = line.chars().next() {
                     if first_char == '*' || first_char == '|' {
@@ -193,7 +190,7 @@ impl PagerApp {
     }
 
     fn get_line_file(&self, mut line: String) -> Option<String> {
-        if self.log_style == LogStyle::OneLine || self.log_style == LogStyle::OneLineGraph {
+        if self.log_style == LogStyle::OneLine {
             return None;
         }
         self.remove_graph_symbols(&mut line);
@@ -206,7 +203,7 @@ impl PagerApp {
     }
 
     fn get_line_line_number(&self, mut line: String) -> Option<usize> {
-        if self.log_style == LogStyle::OneLine || self.log_style == LogStyle::OneLineGraph {
+        if self.log_style == LogStyle::OneLine {
             return None;
         }
         self.remove_graph_symbols(&mut line);
@@ -224,7 +221,7 @@ impl PagerApp {
     fn get_line_commit(&self, mut line: String) -> Option<String> {
         self.remove_graph_symbols(&mut line);
         match self.log_style {
-            LogStyle::StandardGraph | LogStyle::Standard => {
+            LogStyle::Standard => {
                 let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
                 if first == "commit" {
                     let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
@@ -233,7 +230,7 @@ impl PagerApp {
                     }
                 }
             }
-            LogStyle::OneLineGraph | LogStyle::OneLine => {
+            LogStyle::OneLine => {
                 // assume this is the first word
                 let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
                 if !commit.is_empty() {
