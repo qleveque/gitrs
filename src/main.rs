@@ -80,6 +80,12 @@ enum Commands {
         /// Arguments passed to git reflog
         args: Vec<String>,
     },
+    /// Diff view
+    #[command(allow_hyphen_values = true)]
+    Diff {
+        /// Arguments passed to git reflog
+        args: Vec<String>,
+    },
     /// Stash view
     Stash,
 }
@@ -92,6 +98,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Log { args } => PagerApp::new(Some(PagerCommand::Log(args)))?.run(terminal),
         Commands::Show { args } => PagerApp::new(Some(PagerCommand::Show(args)))?.run(terminal),
         Commands::Reflog { args } => PagerApp::new(Some(PagerCommand::Reflog(args)))?.run(terminal),
+        Commands::Diff { args } => PagerApp::new(Some(PagerCommand::Diff(args)))?.run(terminal),
         Commands::Stash => StashApp::new()?.run(terminal),
     };
     ret

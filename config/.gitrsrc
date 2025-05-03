@@ -66,7 +66,7 @@ map global yf !echo '%(file)' | %(clip)
 # | | <kbd>yy</kbd> | Yank text |
 map global yy !echo '%(text)' | %(clip)
 
-# | Log, Show, Reflog | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
+# | Log, Show, Reflog, Diff | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map pager <cr> open_files_app
 map pager <rclick> open_files_app
 
@@ -80,7 +80,9 @@ map pager C pager_previous_commit
 map pager !r !%(git) rebase -i %(rev)^
 
 # | | <kbd>d</kbd> | Git difftool |
-map pager d !%(git) difftool %(rev)^..%(rev) -- %(file)
+map log d !%(git) difftool %(rev)^..%(rev) -- %(file)
+map show d !%(git) difftool %(rev)^..%(rev) -- %(file)
+map diff d !%(git) difftool -- %(file)
 
 # | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
@@ -99,7 +101,7 @@ map blame h previous_commit_blame
 map blame <left> previous_commit_blame
 
 # | | <kbd>d</kbd> | Git difftool |
-map global d !%(git) difftool %(rev)^..%(rev) -- %(file)
+map blame d !%(git) difftool %(rev)^..%(rev) -- %(file)
 
 # | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 map stash <cr> open_files_app
@@ -163,12 +165,14 @@ map status:staged d !%(git) difftool --staged -- %(file)
 # Buttons
 button global " X " quit
 
-# Pager: Log, Show, Reflog
+# Pager: Log, Show, Reflog, Diff
 button pager " ↵ " open_files_app
-button pager " ↓ " pager_next_commit
-button pager " ↑ " pager_previous_commit
-button pager Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
-button pager Rebase !%(git) rebase -i %(rev)^
+button log " ↓ " pager_next_commit
+button log " ↑ " pager_previous_commit
+button log Rebase !%(git) rebase -i %(rev)^
+button log Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
+button show Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
+button diff Diff !%(git) difftool -- %(file)
 
 # Files
 button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)

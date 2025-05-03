@@ -8,7 +8,7 @@
 
 ## Features
 
-* Status, Log, Show, Reflog, Files, Blame, and Stash views
+* Status, Log, Show, Reflog, Diff, Files, Blame, and Stash views
 * Interactive Git pager with smooth navigation
 * Fully customizable key mappings and mouse-friendly buttons
 * Built-in and shell-integrated actions
@@ -26,6 +26,7 @@ gitrs status
 gitrs log [...params]
 gitrs show [...params]
 gitrs reflog [...params]
+gitrs diff [...params]
 gitrs stash
 gitrs files [revision]
 gitrs blame <file> [line]
@@ -64,8 +65,7 @@ set <option> <value>
 
 ### Actions
 
-By default, an action can be ran at runtime by pressing `:` and then typing the desired action.
-An action can be a:
+By default, actions can be run at runtime by pressing <kbd>:</kbd> and typing the desired one. An action can be a:
 
 - **Shell command**:
     * `!` Run and wait
@@ -94,7 +94,7 @@ An action can be a:
 * `global`
 * `files[:(new|modified|deleted)]`
 * `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
-* `pager` `show` `log` `reflog`
+* `pager` `show` `log` `reflog` `diff`
 * `blame`
 * `stash`
 

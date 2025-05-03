@@ -24,6 +24,7 @@ pub enum MappingScope {
     Log,
     Show,
     Reflog,
+    Diff,
     Stash,
     Blame,
 }
@@ -43,6 +44,7 @@ impl FromStr for MappingScope {
             "reflog" => Ok(MappingScope::Reflog),
             "stash" => Ok(MappingScope::Stash),
             "blame" => Ok(MappingScope::Blame),
+            "diff" => Ok(MappingScope::Diff),
             "files" => {
                 let file_status = match split.next() {
                     Some(file_status_str) => Some(file_status_str.parse()?),
