@@ -202,7 +202,11 @@ impl GitApp for FilesApp {
     }
 
     fn on_click(&mut self) {
-        if self.view_model.files_rect.contains(self.state.mouse_position) {
+        if self
+            .view_model
+            .files_rect
+            .contains(self.state.mouse_position)
+        {
             let delta = (self.state.mouse_position.y - self.view_model.files_rect.y) as usize;
             self.state
                 .list_state

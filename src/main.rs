@@ -83,7 +83,13 @@ enum Commands {
     /// Diff view
     #[command(allow_hyphen_values = true)]
     Diff {
-        /// Arguments passed to git reflog
+        /// Arguments passed to git diff
+        args: Vec<String>,
+    },
+    /// Branch view
+    #[command(allow_hyphen_values = true)]
+    Branch {
+        /// Arguments passed to git branch
         args: Vec<String>,
     },
     /// Stash view
@@ -99,6 +105,7 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
         Commands::Show { args } => PagerApp::new(Some(PagerCommand::Show(args)))?.run(terminal),
         Commands::Reflog { args } => PagerApp::new(Some(PagerCommand::Reflog(args)))?.run(terminal),
         Commands::Diff { args } => PagerApp::new(Some(PagerCommand::Diff(args)))?.run(terminal),
+        Commands::Branch { args } => PagerApp::new(Some(PagerCommand::Branch(args)))?.run(terminal),
         Commands::Stash => StashApp::new()?.run(terminal),
     };
     ret

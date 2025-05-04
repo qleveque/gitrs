@@ -76,9 +76,11 @@ impl<'a> BlameApp {
     }
 
     fn get_current_file(&self) -> Result<String, Error> {
-        Ok(self.files
+        Ok(self
+            .files
             .last()
-            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?.to_string())
+            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?
+            .to_string())
     }
 
     fn highlighted_lines(&self) -> Result<Vec<Line<'a>>, Error> {
@@ -317,7 +319,7 @@ impl GitApp for BlameApp {
                     file,
                     self.idx().unwrap_or(0) + 1,
                     self.blames.len(),
-                )
+                ),
             );
         }
     }

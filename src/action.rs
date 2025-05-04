@@ -35,6 +35,7 @@ pub enum Action {
     FocusUnstagedView,
     FocusStagedView,
     OpenFilesApp,
+    OpenLogApp,
     OpenShowApp,
     NextCommitBlame,
     PreviousCommitBlame,
@@ -80,6 +81,7 @@ impl FromStr for Action {
             "focus_unstaged_view" => Ok(Action::FocusUnstagedView),
             "focus_staged_view" => Ok(Action::FocusStagedView),
             "open_files_app" => Ok(Action::OpenFilesApp),
+            "open_log_app" => Ok(Action::OpenLogApp),
             "open_show_app" => Ok(Action::OpenShowApp),
             "next_commit_blame" => Ok(Action::NextCommitBlame),
             "previous_commit_blame" => Ok(Action::PreviousCommitBlame),
@@ -100,7 +102,7 @@ impl FromStr for Action {
                     }
                 };
                 return Ok(Action::GoTo(0));
-            },
+            }
             _ => {
                 if let Ok(number) = s.parse::<usize>() {
                     if number > 0 {

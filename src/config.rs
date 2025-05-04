@@ -25,6 +25,7 @@ pub enum MappingScope {
     Show,
     Reflog,
     Diff,
+    Branch,
     Stash,
     Blame,
 }
@@ -42,6 +43,7 @@ impl FromStr for MappingScope {
             "log" => Ok(MappingScope::Log),
             "show" => Ok(MappingScope::Show),
             "reflog" => Ok(MappingScope::Reflog),
+            "branch" => Ok(MappingScope::Branch),
             "stash" => Ok(MappingScope::Stash),
             "blame" => Ok(MappingScope::Blame),
             "diff" => Ok(MappingScope::Diff),

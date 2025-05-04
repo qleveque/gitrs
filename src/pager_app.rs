@@ -32,6 +32,9 @@ pub enum LogStyle {
     Standard,
     OneLine,
     Diff,
+    Branch,
+    Reflog,
+    Unknown,
 }
 
 pub enum PagerCommand {
@@ -39,6 +42,7 @@ pub enum PagerCommand {
     Show(Vec<String>),
     Reflog(Vec<String>),
     Diff(Vec<String>),
+    Branch(Vec<String>),
 }
 
 pub struct PagerApp {
@@ -70,6 +74,7 @@ impl PagerApp {
                     PagerCommand::Show(args) => ("show", args, MappingScope::Show),
                     PagerCommand::Reflog(args) => ("reflog", args, MappingScope::Reflog),
                     PagerCommand::Diff(args) => ("diff", args, MappingScope::Diff),
+                    PagerCommand::Branch(args) => ("branch", args, MappingScope::Branch),
                 };
                 mapping_scopes.insert(0, scope);
                 let bufreader: BufReader<ChildStdout> =
@@ -95,24 +100,48 @@ impl PagerApp {
         let first_line = String::from_utf8(bytes)?;
 
         let mut words = first_line.split(' ');
-        // Hopefully this is enough
-        let log_style = match words.next().unwrap_or("") {
-            "commit" => LogStyle::Standard,
-            "diff" => LogStyle::Diff,
-            "*" => {
-                graph = true;
-                match words.next().unwrap_or("") {
-                    "commit" => LogStyle::Standard,
-                    _ => LogStyle::OneLine,
+        let log_style = match words.next() {
+            Some("") => {
+                let branch = words.next();
+                let end = words.next();
+                if branch.is_some() && end.is_none() {
+                    LogStyle::Branch
+                } else {
+                    LogStyle::Unknown
                 }
             }
-            _ => LogStyle::OneLine,
+            Some("commit") => LogStyle::Standard,
+            Some("diff") => LogStyle::Diff,
+            Some("*") => match words.next() {
+                Some("commit") => {
+                    graph = true;
+                    LogStyle::Standard
+                }
+                Some(_) => match words.next() {
+                    None => LogStyle::Branch,
+                    Some(_) => {
+                        graph = true;
+                        LogStyle::OneLine
+                    }
+                },
+                None => LogStyle::Unknown,
+            },
+            Some(_) => {
+                if first_line.contains("HEAD@{0}:") {
+                    LogStyle::Reflog
+                } else {
+                    LogStyle::OneLine
+                }
+            }
+            None => LogStyle::Unknown,
         };
 
         if matches!(iterator, Input::Stdin) {
             if log_style == LogStyle::Diff {
                 mapping_scopes.insert(0, MappingScope::Diff);
-            } else if first_line.contains("HEAD@{0}:") {
+            } else if log_style == LogStyle::Branch {
+                mapping_scopes.insert(0, MappingScope::Branch);
+            } else if log_style == LogStyle::Reflog {
                 mapping_scopes.insert(0, MappingScope::Reflog);
             } else {
                 mapping_scopes.insert(0, MappingScope::Log);
@@ -253,6 +282,15 @@ impl PagerApp {
                     return Some(commit.to_string());
                 }
             }
+            LogStyle::Reflog => {
+                if line.contains("HEAD@{") {
+                    let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
+                    if !commit.is_empty() {
+                        return Some(commit.to_string());
+                    }
+                }
+                return None;
+            }
             LogStyle::Diff => {
                 let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
                 if first == "index" {
@@ -261,6 +299,13 @@ impl PagerApp {
                         return Some(commit.to_string());
                     }
                 }
+            }
+            LogStyle::Branch => {
+                let branch = &line[2..].to_string();
+                return Some(branch.to_string());
+            }
+            LogStyle::Unknown => {
+                return None;
             }
         }
         return None;
@@ -328,7 +373,9 @@ impl GitApp for PagerApp {
                 .get_stripped_line(idx)
                 .map_err(|_| Error::GitParsingError)?;
             self.remove_graph_symbols(&mut line);
-            let stat_re = Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)").unwrap();
+            let stat_re =
+                Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)")
+                    .unwrap();
             if Path::new(&line).is_file() {
                 file = Some(line);
             } else if let Some(caps) = stat_re.captures(&line) {

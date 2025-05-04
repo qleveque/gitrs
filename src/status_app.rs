@@ -203,7 +203,11 @@ impl GitApp for StatusApp {
                     .list_state
                     .select(Some(self.state.list_state.offset() + delta - 1));
             }
-        } else if self.view_model.bottom_rect.contains(self.state.mouse_position) {
+        } else if self
+            .view_model
+            .bottom_rect
+            .contains(self.state.mouse_position)
+        {
             self.staged_status = StagedStatus::Staged;
             let delta = (self.state.mouse_position.y - self.view_model.bottom_rect.y) as usize;
             if delta > 0 {
@@ -332,7 +336,11 @@ impl GitApp for StatusApp {
     fn on_scroll(&mut self, down: bool) {
         if self.view_model.top_rect.contains(self.state.mouse_position) {
             self.staged_status = StagedStatus::Unstaged;
-        } else if self.view_model.bottom_rect.contains(self.state.mouse_position) {
+        } else if self
+            .view_model
+            .bottom_rect
+            .contains(self.state.mouse_position)
+        {
             self.staged_status = StagedStatus::Staged;
         };
         let rect = match self.staged_status {

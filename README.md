@@ -87,7 +87,7 @@ By default, actions can be run at runtime by pressing <kbd>:</kbd> and typing th
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
     - Log specific: `pager_next_commit`, `pager_previous_commit`
     - Stash specific: `stash_drop`, `stash_apply`, `stash_pop`
-    - Others: `nop`, `echo`, `reload`, `quit`, `open_files_app`, `open_show_app`
+    - Others: `nop`, `echo`, `reload`, `quit`, `open_files_app`, `open_show_app`, `open_log_app`
 
 ### Scopes
 

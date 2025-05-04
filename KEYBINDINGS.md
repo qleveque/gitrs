@@ -22,10 +22,11 @@
 | | <kbd>yf</kbd> | Yank file path |
 | | <kbd>yy</kbd> | Yank text |
 | Log, Show, Reflog, Diff | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-| | <kbd>c</kbd> | Next commit |
+| Branch | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open log view |
+| Log, Reflog | <kbd>c</kbd> | Next commit |
 | | <kbd>C</kbd> | Previous commit |
 | | <kbd>!r</kbd> | Interactive rebase on commit |
-| | <kbd>d</kbd> | Git difftool |
+| Log, Show, Reflog, Diff | <kbd>d</kbd> | Git difftool |
 | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
 | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
