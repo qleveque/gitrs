@@ -4,7 +4,7 @@ mod app_state;
 mod blame_app;
 mod config;
 mod errors;
-mod files_app;
+mod show_app;
 mod git;
 mod pager_app;
 mod pager_widget;
@@ -19,7 +19,7 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use files_app::FilesApp;
+use show_app::ShowApp;
 use pager_app::{PagerApp, PagerCommand};
 use stash_app::StashApp;
 use status_app::StatusApp;
@@ -57,8 +57,8 @@ enum Commands {
         line: usize,
     },
 
-    /// Files view
-    Files {
+    /// Show view
+    Show {
         /// Optional revision hash or reference
         revision: Option<String>,
     },
@@ -68,28 +68,10 @@ enum Commands {
         /// Arguments passed to git log
         args: Vec<String>,
     },
-    /// Show view
-    #[command(allow_hyphen_values = true)]
-    Show {
-        /// Arguments passed to git show
-        args: Vec<String>,
-    },
-    /// Reflog view
-    #[command(allow_hyphen_values = true)]
-    Reflog {
-        /// Arguments passed to git reflog
-        args: Vec<String>,
-    },
     /// Diff view
     #[command(allow_hyphen_values = true)]
     Diff {
         /// Arguments passed to git diff
-        args: Vec<String>,
-    },
-    /// Branch view
-    #[command(allow_hyphen_values = true)]
-    Branch {
-        /// Arguments passed to git branch
         args: Vec<String>,
     },
     /// Stash view
@@ -100,12 +82,9 @@ fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> 
     let ret = match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
-        Commands::Files { revision } => FilesApp::new(revision)?.run(terminal),
+        Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
         Commands::Log { args } => PagerApp::new(Some(PagerCommand::Log(args)))?.run(terminal),
-        Commands::Show { args } => PagerApp::new(Some(PagerCommand::Show(args)))?.run(terminal),
-        Commands::Reflog { args } => PagerApp::new(Some(PagerCommand::Reflog(args)))?.run(terminal),
         Commands::Diff { args } => PagerApp::new(Some(PagerCommand::Diff(args)))?.run(terminal),
-        Commands::Branch { args } => PagerApp::new(Some(PagerCommand::Branch(args)))?.run(terminal),
         Commands::Stash => StashApp::new()?.run(terminal),
     };
     ret

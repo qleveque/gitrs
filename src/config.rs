@@ -18,11 +18,10 @@ const DEFAULT_CONFIG: &str = include_str!("../config/.gitrsrc");
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum MappingScope {
     Global,
-    Files(Option<FileStatus>),
+    Show(Option<FileStatus>),
     Status(Option<StagedStatus>, Option<FileStatus>),
     Pager,
     Log,
-    Show,
     Diff,
     Branch,
     Stash,
@@ -40,17 +39,16 @@ impl FromStr for MappingScope {
             "global" => Ok(MappingScope::Global),
             "pager" => Ok(MappingScope::Pager),
             "log" => Ok(MappingScope::Log),
-            "show" => Ok(MappingScope::Show),
             "branch" => Ok(MappingScope::Branch),
             "stash" => Ok(MappingScope::Stash),
             "blame" => Ok(MappingScope::Blame),
             "diff" => Ok(MappingScope::Diff),
-            "files" => {
+            "show" => {
                 let file_status = match split.next() {
                     Some(file_status_str) => Some(file_status_str.parse()?),
                     None => None,
                 };
-                Ok(MappingScope::Files(file_status))
+                Ok(MappingScope::Show(file_status))
             }
             "status" => {
                 let staged_status = match split.next() {

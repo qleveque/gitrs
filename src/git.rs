@@ -369,17 +369,6 @@ pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String
 }
 
 // Done by chatgpt
-pub fn is_branch(branch: &str) -> bool {
-    let full_ref = format!("refs/heads/{}", branch);
-
-    let output = Command::new("git")
-        .args(["show-ref", "--verify", &full_ref])
-        .output();
-
-    matches!(output, Ok(output) if output.status.success())
-}
-
-// Done by chatgpt
 pub fn is_valid_git_rev(rev: &str) -> bool {
     let output = Command::new("git")
         .args(["rev-parse", "--verify", rev])

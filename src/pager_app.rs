@@ -12,7 +12,7 @@ use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_pager_output, is_branch, is_valid_git_rev, set_git_dir};
+use crate::git::{git_pager_output, is_valid_git_rev, set_git_dir};
 use crate::pager_widget::PagerWidget;
 use crate::ui::clean_buggy_characters;
 
@@ -34,7 +34,6 @@ pub enum LogStyle {
     Standard,
     OneLine,
     Diff,
-    Branch,
     Reflog,
     // pagers
     StashPager,
@@ -44,12 +43,11 @@ pub enum LogStyle {
 impl fmt::Display for LogStyle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match self {
-            LogStyle::Standard => "log",
-            LogStyle::OneLine => "oneline log",
-            LogStyle::Diff => "diff",
-            LogStyle::Branch => "branch",
-            LogStyle::Reflog => "reflog",
-            LogStyle::StashPager => "stash pager",
+            LogStyle::Standard => "log pager",
+            LogStyle::OneLine => "log pager (oneline)",
+            LogStyle::Reflog => "log pager (reflog)",
+            LogStyle::StashPager => "log pager (stash)",
+            LogStyle::Diff => "diff pager",
             LogStyle::Unknown => "pager",
         };
         write!(f, "{}", s)
@@ -59,9 +57,7 @@ impl fmt::Display for LogStyle {
 pub enum PagerCommand {
     Log(Vec<String>),
     Show(Vec<String>),
-    Reflog(Vec<String>),
     Diff(Vec<String>),
-    Branch(Vec<String>),
 }
 
 pub struct PagerApp {
@@ -95,8 +91,8 @@ fn remove_graph_symbols(line: &mut String) {
 }
 
 fn guess_log_style(line: &mut String) -> LogStyle {
-    match line.split(' ').next() {
-        Some("") => LogStyle::Branch,
+    let mut words = line.split(' ');
+    match words.next() {
         Some("commit") => LogStyle::Standard,
         Some("diff") => LogStyle::Diff,
         Some(rev) => {
@@ -107,7 +103,7 @@ fn guess_log_style(line: &mut String) -> LogStyle {
             } else if line.contains(" 1) ") {
                 LogStyle::Unknown
             } else {
-                if is_valid_git_rev(rev) {
+                if words.next().is_some() && is_valid_git_rev(rev) {
                     LogStyle::OneLine
                 } else {
                     LogStyle::Unknown
@@ -124,15 +120,12 @@ impl PagerApp {
         let git_exe = state.config.git_exe.clone();
         let mut log_style = LogStyle::Unknown;
 
-        let mut graph = false;
         let mut iterator = match pager_command {
             Some(pager_command) => {
                 let (git_command, args, style) = match pager_command {
                     PagerCommand::Log(args) => ("log", args, LogStyle::Unknown),
                     PagerCommand::Show(args) => ("show", args, LogStyle::Standard),
-                    PagerCommand::Reflog(args) => ("reflog", args, LogStyle::Reflog),
                     PagerCommand::Diff(args) => ("diff", args, LogStyle::Diff),
-                    PagerCommand::Branch(args) => ("branch", args, LogStyle::Branch),
                 };
                 log_style = style;
                 let bufreader: BufReader<ChildStdout> =
@@ -156,20 +149,7 @@ impl PagerApp {
         let first_line = String::from_utf8(strip_ansi_escapes::strip(&first_line_ansi.as_bytes()))?;
 
         // Test if there is a graph mode
-        let mut first_line_words = first_line.split(' ');
-        if Some("*") == first_line_words.next() {
-            if matches!(iterator, Input::Stdin) {
-                if is_branch(first_line_words.next().unwrap_or("")) {
-                    log_style = LogStyle::Branch;
-                } else {
-                    graph = true;
-                }
-            } else {
-                if log_style != LogStyle::Branch {
-                    graph = true;
-                }
-            }
-        }
+        let graph = Some("*") == first_line.split(' ').next();
 
         let mut line = first_line.clone();
         if graph {
@@ -181,7 +161,6 @@ impl PagerApp {
 
         let mapping_scope = match log_style {
             LogStyle::Diff => MappingScope::Diff,
-            LogStyle::Branch => MappingScope::Branch,
             LogStyle::Reflog => MappingScope::Log,
             LogStyle::Standard => MappingScope::Log,
             LogStyle::OneLine => MappingScope::Log,
@@ -338,10 +317,6 @@ impl PagerApp {
                         return Some(commit.to_string());
                     }
                 }
-            }
-            LogStyle::Branch => {
-                let branch = &line[2..].to_string();
-                return Some(branch.to_string());
             }
             LogStyle::Unknown => {
                 return None;

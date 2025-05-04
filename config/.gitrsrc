@@ -54,8 +54,8 @@ map global n next_search_result
 # | | <kbd>N</kbd> | Previous search result |
 map global N previous_search_result
 
-# | | <kbd>s</kbd> | Open show view |
-map global s open_show_app
+# | | <kbd>s</kbd> | Open git show |
+map global s open_git_show
 
 # | | <kbd>yc</kbd> | Yank commit hash |
 map global yc !echo '%(rev)' | %(clip)
@@ -66,37 +66,32 @@ map global yf !echo '%(file)' | %(clip)
 # | | <kbd>yy</kbd> | Yank text |
 map global yy !echo '%(text)' | %(clip)
 
-# | Log, Show | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-map log <cr> open_files_app
-map log <rclick> open_files_app
-map show <cr> open_files_app
-map show <rclick> open_files_app
+# | Log | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
+map log <cr> open_show_app
+map log <rclick> open_show_app
 
-# | Log  | <kbd>c</kbd> | Next commit |
+# | | <kbd>c</kbd> | Next commit |
 map log c pager_next_commit
 
 # | | <kbd>C</kbd> | Previous commit |
 map log C pager_previous_commit
 
-# | Log, Show, Diff | <kbd>d</kbd> | Git difftool |
-map log d !%(git) difftool %(rev)^..%(rev) -- %(file)
-map show d !%(git) difftool %(rev)^..%(rev) -- %(file)
-map diff d !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
-
-# | Log | <kbd>!r</kbd> | Interactive rebase on commit |
+# | | <kbd>!r</kbd> | Interactive rebase on commit |
 map log !r !%(git) rebase -i %(rev)^
 
-# | Branch | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open log view |
-map branch <cr> open_log_app
-map branch <rclick> open_log_app
+# | | <kbd>d</kbd> | Git difftool |
+map log d !%(git) difftool %(rev)^..%(rev) -- %(file)
 
-# | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
-map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
-map files <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
+# | Diff | <kbd>d</kbd> | Git difftool |
+map diff d !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
 
-# | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-map blame <cr> open_files_app
-map blame <rclick> open_files_app
+# | Show | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
+map show <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
+map show <rclick> !%(git) difftool %(rev)^..%(rev) -- %(file)
+
+# | Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
+map blame <cr> open_show_app
+map blame <rclick> open_show_app
 
 # | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
 map blame l next_commit_blame
@@ -109,9 +104,12 @@ map blame <left> previous_commit_blame
 # | | <kbd>d</kbd> | Git difftool |
 map blame d !%(git) difftool %(rev)^..%(rev) -- %(file)
 
-# | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-map stash <cr> open_files_app
-map stash <rclick> open_files_app
+# | Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
+map stash <cr> open_show_app
+map stash <rclick> open_show_app
+
+# | | <kbd>r</kbd> | Reload |
+map stash r reload
 
 # | | <kbd>!a</kbd> | Apply stash |
 map stash !a !%(git) stash apply
@@ -126,7 +124,7 @@ map stash !d !%(git) stash drop
 map status <cr> stage_unstage_file
 map status <rclick> stage_unstage_file
 
-# | | <kbd>r</kbd> | Reload status |
+# | | <kbd>r</kbd> | Reload |
 map status r reload
 
 # | | <kbd>t</kbd> | Toggle stage file |
@@ -171,27 +169,27 @@ map status:staged d !%(git) difftool --staged -- %(file)
 # Buttons
 button global " X " quit
 
-# Pager: Log, Show, Diff
-button log " ↵ " open_files_app
-button show " ↵ " open_files_app
-button branch " ↵ " open_log_app
+# Log
+button log " ↵ " open_show_app
 button log " ↓ " pager_next_commit
 button log " ↑ " pager_previous_commit
 button log Rebase !%(git) rebase -i %(rev)^
 button log Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
-button show Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
+
+# Diff
 button diff Diff !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
 
-# Files
-button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
+# Show
+button show " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
 
 # Blame
-button blame " ↵ " open_files_app
+button blame " ↵ " open_show_app
 button blame " ← " previous_commit_blame
 button blame " → " next_commit_blame
 
 # Stash
-button stash " ↵ " open_files_app
+button stash " ↵ " open_show_app
+button stash " ⟳ " reload
 button stash Apply !%(git) stash apply
 button stash Pop !%(git) stash pop
 button stash Drop !%(git) stash drop

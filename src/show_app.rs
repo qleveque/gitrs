@@ -22,20 +22,20 @@ use ratatui::{
 
 use std::env;
 
-struct FilesAppViewModel {
+struct ShowAppViewModel {
     file_list: List<'static>,
     commit_paragraph: Paragraph<'static>,
     files_rect: Rect,
 }
 
-pub struct FilesApp {
+pub struct ShowApp {
     state: AppState,
     commit: Commit,
     original_dir: std::path::PathBuf,
-    view_model: FilesAppViewModel,
+    view_model: ShowAppViewModel,
 }
 
-impl FilesApp {
+impl ShowApp {
     pub fn new(revision: Option<String>) -> Result<Self, Error> {
         let mut state = AppState::new()?;
         let original_dir = env::current_dir()?;
@@ -53,7 +53,7 @@ impl FilesApp {
             state,
             commit,
             original_dir,
-            view_model: FilesAppViewModel {
+            view_model: ShowAppViewModel {
                 file_list: List::default(),
                 commit_paragraph: Paragraph::default(),
                 files_rect: Rect::default(),
@@ -88,7 +88,7 @@ impl FilesApp {
     }
 }
 
-impl GitApp for FilesApp {
+impl GitApp for ShowApp {
     fn state(&mut self) -> &mut AppState {
         &mut self.state
     }
@@ -176,8 +176,8 @@ impl GitApp for FilesApp {
             .get(self.idx().unwrap_or(usize::MAX))
             .map(|(a, _)| a);
         vec![
-            MappingScope::Files(file.copied()),
-            MappingScope::Files(None),
+            MappingScope::Show(file.copied()),
+            MappingScope::Show(None),
         ]
     }
 

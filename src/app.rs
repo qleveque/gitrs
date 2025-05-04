@@ -36,7 +36,7 @@ use crate::{
     action::{Action, CommandType},
     app_state::{AppState, InputState},
     errors::Error,
-    files_app::FilesApp,
+    show_app::ShowApp,
 };
 
 const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
@@ -559,13 +559,13 @@ pub trait GitApp {
             Action::Map(line) => self.state().config.parse_map_line(line, false)?,
             Action::Set(line) => self.state().config.parse_set_line(line)?,
             Action::Button(line) => self.state().config.parse_button_line(line, false)?,
-            Action::OpenFilesApp | Action::OpenShowApp | Action::OpenLogApp => {
+            Action::OpenGitShow | Action::OpenShowApp | Action::OpenLogApp => {
                 let (_, rev, _) = self.get_file_rev_line()?;
                 if let Some(rev) = rev {
                     terminal.clear()?;
                     match action {
-                        Action::OpenFilesApp => FilesApp::new(Some(rev))?.run(terminal)?,
-                        Action::OpenShowApp => {
+                        Action::OpenShowApp => ShowApp::new(Some(rev))?.run(terminal)?,
+                        Action::OpenGitShow => {
                             PagerApp::new(Some(PagerCommand::Show(vec![rev])))?.run(terminal)?
                         }
                         Action::OpenLogApp => {
