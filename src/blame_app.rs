@@ -162,7 +162,7 @@ impl<'a> BlameApp {
         revision: Option<String>,
         config: &Config,
     ) -> Result<(Vec<Option<CommitRef>>, Vec<String>), Error> {
-        let output = git_blame_output(file, revision.clone(), config);
+        let output = git_blame_output(file, revision.clone(), config)?;
 
         let mut blame_column = Vec::new();
         let mut code_column = Vec::new();

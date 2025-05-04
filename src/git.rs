@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env,
     io::{BufRead, BufReader},
-    process::{exit, ChildStdout, Command, Stdio},
+    process::{ChildStdout, Command, Stdio},
     str::FromStr,
 };
 
@@ -152,33 +152,46 @@ impl GitFile {
     }
 }
 
-pub fn git_status_output(config: &Config) -> String {
-    let output = Command::new(config.git_exe.clone())
+pub fn git_status_output(config: &Config) -> Result<String, Error> {
+    let mut child = Command::new(config.git_exe.clone())
         .args(["status", "--short", "--no-renames"])
         .stdout(Stdio::piped())
         .spawn()
         .expect("Failed to execute git command");
 
-    let stdout = output.stdout.expect("Failed to capture stdout");
+    let stdout = child.stdout.take().expect("Failed to capture stdout");
     let reader = BufReader::new(stdout);
 
-    let lines = reader.lines().filter_map(Result::ok);
-    lines.collect::<Vec<String>>().join("\n")
+    let lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
+    let output_text = lines.join("\n");
+
+    let status = child.wait().expect("Failed to wait on child");
+
+    if !status.success() {
+        return Err(Error::GitCommandError);
+    }
+    Ok(output_text)
 }
 
-pub fn git_blame_output(file: String, revision: Option<String>, config: &Config) -> String {
-    let mut args: Vec<String> = vec!["blame".to_string(), file.clone()];
+pub fn git_blame_output(file: String, revision: Option<String>, config: &Config) -> Result<String, Error> {
+    let mut args: Vec<String> = vec!["blame".to_string()];
     if let Some(rev) = revision {
-        args.push(rev.clone());
+        args.push(rev);
     }
+    args.push(file);
+
     let output = Command::new(config.git_exe.clone())
         .args(args)
         .output()
-        .expect("Failed to execute git blame");
+        .map_err(|_| Error::GitCommandError)?;
 
-    String::from_utf8_lossy(&output.stdout)
+    if !output.status.success() {
+        return Err(Error::GitCommandError);
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout)
         .to_string()
-        .replace("\t", "    ")
+        .replace('\t', "    "))
 }
 
 pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
@@ -235,19 +248,26 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
 }
 
 pub fn git_stash_output(config: &Config) -> Result<String, Error> {
-    let args: Vec<String> = vec![
+    let args = vec![
         "stash".to_string(),
         "list".to_string(),
         "--format=%cd\t%s".to_string(),
         "--date=iso-local".to_string(),
     ];
-    let output = Command::new(config.git_exe.clone()).args(args).output()?;
+    let output = Command::new(config.git_exe.clone())
+        .args(args)
+        .output()
+        .map_err(|_| Error::GitCommandError)?;
+
+    if !output.status.success() {
+        return Err(Error::GitCommandError);
+    }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-pub fn git_files_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
-    let mut args: Vec<String> = vec![
+pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<String, Error> {
+    let mut args = vec![
         "show".to_string(),
         "--decorate".to_string(),
         "--name-status".to_string(),
@@ -257,7 +277,15 @@ pub fn git_files_output(revision: &Option<String>, config: &Config) -> Result<St
     if let Some(rev) = revision {
         args.push(rev.clone());
     }
-    let output = Command::new(config.git_exe.clone()).args(args).output()?;
+
+    let output = Command::new(config.git_exe.clone())
+        .args(args)
+        .output()
+        .map_err(|_| Error::GitCommandError)?;
+
+    if !output.status.success() {
+        return Err(Error::GitCommandError);
+    }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
@@ -294,7 +322,7 @@ pub fn adapt_repo_root(root: String) -> String {
     root
 }
 
-pub fn set_git_dir(config: &Config) {
+pub fn set_git_dir(config: &Config) -> Result<(), Error> {
     // get git repo root dir
     let output = Command::new(config.git_exe.clone())
         .args(["rev-parse", "--show-toplevel"])
@@ -302,12 +330,12 @@ pub fn set_git_dir(config: &Config) {
         .expect("Failed to execute git command");
 
     if !output.status.success() {
-        eprintln!("Not inside a Git repository");
-        exit(1);
+        return Err(Error::NotInGitRepoError);
     }
     let mut repo_root = String::from_utf8_lossy(&output.stdout);
     repo_root = adapt_repo_root(repo_root.to_string().clone()).into();
     env::set_current_dir(repo_root.trim()).expect("Failed to change directory");
+    Ok(())
 }
 
 pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
@@ -350,7 +378,7 @@ pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String
         .output()?;
 
     if !output.status.success() {
-        return Err(Error::GlobalError("git diff command failed".to_string()));
+        return Err(Error::GitCommandError);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -366,17 +394,6 @@ pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String
 
     // No rename found; return the same name
     Ok(current_filename.to_string())
-}
-
-// Done by chatgpt
-pub fn is_branch(branch: &str) -> bool {
-    let full_ref = format!("refs/heads/{}", branch);
-
-    let output = Command::new("git")
-        .args(["show-ref", "--verify", &full_ref])
-        .output();
-
-    matches!(output, Ok(output) if output.status.success())
 }
 
 // Done by chatgpt

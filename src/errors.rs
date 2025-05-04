@@ -26,6 +26,10 @@ pub enum Error {
     GlobalError(String),
     #[error("could not properly parse git output")]
     GitParsingError,
+    #[error("not inside a git repository")]
+    NotInGitRepoError,
+    #[error("error running a git command")]
+    GitCommandError,
     #[error("could not properly highlight code")]
     SyntaxError(#[from] syntect::Error),
 }

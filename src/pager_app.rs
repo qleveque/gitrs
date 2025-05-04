@@ -12,7 +12,7 @@ use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_pager_output, is_branch, is_valid_git_rev, set_git_dir};
+use crate::git::{git_pager_output, is_valid_git_rev, set_git_dir};
 use crate::pager_widget::PagerWidget;
 use crate::ui::clean_buggy_characters;
 
@@ -34,7 +34,6 @@ pub enum LogStyle {
     Standard,
     OneLine,
     Diff,
-    Branch,
     Reflog,
     // pagers
     StashPager,
@@ -45,11 +44,10 @@ impl fmt::Display for LogStyle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match self {
             LogStyle::Standard => "log",
-            LogStyle::OneLine => "oneline log",
+            LogStyle::OneLine => "log (oneline)",
+            LogStyle::Reflog => "log (reflog)",
+            LogStyle::StashPager => "log (stash)",
             LogStyle::Diff => "diff",
-            LogStyle::Branch => "branch",
-            LogStyle::Reflog => "reflog",
-            LogStyle::StashPager => "stash pager",
             LogStyle::Unknown => "pager",
         };
         write!(f, "{}", s)
@@ -59,9 +57,7 @@ impl fmt::Display for LogStyle {
 pub enum PagerCommand {
     Log(Vec<String>),
     Show(Vec<String>),
-    Reflog(Vec<String>),
     Diff(Vec<String>),
-    Branch(Vec<String>),
 }
 
 pub struct PagerApp {
@@ -95,8 +91,8 @@ fn remove_graph_symbols(line: &mut String) {
 }
 
 fn guess_log_style(line: &mut String) -> LogStyle {
-    match line.split(' ').next() {
-        Some("") => LogStyle::Branch,
+    let mut words = line.split(' ');
+    match words.next() {
         Some("commit") => LogStyle::Standard,
         Some("diff") => LogStyle::Diff,
         Some(rev) => {
@@ -107,7 +103,7 @@ fn guess_log_style(line: &mut String) -> LogStyle {
             } else if line.contains(" 1) ") {
                 LogStyle::Unknown
             } else {
-                if is_valid_git_rev(rev) {
+                if words.next().is_some() && is_valid_git_rev(rev) {
                     LogStyle::OneLine
                 } else {
                     LogStyle::Unknown
@@ -124,15 +120,12 @@ impl PagerApp {
         let git_exe = state.config.git_exe.clone();
         let mut log_style = LogStyle::Unknown;
 
-        let mut graph = false;
         let mut iterator = match pager_command {
             Some(pager_command) => {
                 let (git_command, args, style) = match pager_command {
                     PagerCommand::Log(args) => ("log", args, LogStyle::Unknown),
                     PagerCommand::Show(args) => ("show", args, LogStyle::Standard),
-                    PagerCommand::Reflog(args) => ("reflog", args, LogStyle::Reflog),
                     PagerCommand::Diff(args) => ("diff", args, LogStyle::Diff),
-                    PagerCommand::Branch(args) => ("branch", args, LogStyle::Branch),
                 };
                 log_style = style;
                 let bufreader: BufReader<ChildStdout> =
@@ -156,20 +149,7 @@ impl PagerApp {
         let first_line = String::from_utf8(strip_ansi_escapes::strip(&first_line_ansi.as_bytes()))?;
 
         // Test if there is a graph mode
-        let mut first_line_words = first_line.split(' ');
-        if Some("*") == first_line_words.next() {
-            if matches!(iterator, Input::Stdin) {
-                if is_branch(first_line_words.next().unwrap_or("")) {
-                    log_style = LogStyle::Branch;
-                } else {
-                    graph = true;
-                }
-            } else {
-                if log_style != LogStyle::Branch {
-                    graph = true;
-                }
-            }
-        }
+        let graph = Some("*") == first_line.split(' ').next();
 
         let mut line = first_line.clone();
         if graph {
@@ -181,7 +161,6 @@ impl PagerApp {
 
         let mapping_scope = match log_style {
             LogStyle::Diff => MappingScope::Diff,
-            LogStyle::Branch => MappingScope::Branch,
             LogStyle::Reflog => MappingScope::Log,
             LogStyle::Standard => MappingScope::Log,
             LogStyle::OneLine => MappingScope::Log,
@@ -228,101 +207,101 @@ impl PagerApp {
         });
 
         let original_dir = env::current_dir()?;
-        set_git_dir(&state.config);
+            set_git_dir(&state.config)?;
 
-        let mut r = Self {
-            state,
-            mapping_scopes,
-            lines,
-            log_style,
-            loaded,
-            original_dir,
-            graph,
-            view_model: PagerAppViewModel {
-                list: PagerWidget::default(),
-                rect: Rect::default(),
-                scroll: None,
-            },
-        };
-        r.state.list_state.select_first();
-        Ok(r)
-    }
+            let mut r = Self {
+                state,
+                mapping_scopes,
+                lines,
+                log_style,
+                loaded,
+                original_dir,
+                graph,
+                view_model: PagerAppViewModel {
+                    list: PagerWidget::default(),
+                    rect: Rect::default(),
+                    scroll: None,
+                },
+            };
+            r.state.list_state.select_first();
+            Ok(r)
+        }
 
-    fn get_stripped_line(&self, idx: usize) -> Result<String, Error> {
-        let s = self
-            .lines
-            .lock()
-            .unwrap()
-            .get(idx)
-            .cloned()
-            .ok_or_else(|| Error::StateIndexError)?;
-        let bytes = strip_ansi_escapes::strip(&s.as_bytes());
-        let str = String::from_utf8(bytes)?;
-        Ok(str)
-    }
+        fn get_stripped_line(&self, idx: usize) -> Result<String, Error> {
+            let s = self
+                .lines
+                .lock()
+                .unwrap()
+                .get(idx)
+                .cloned()
+                .ok_or_else(|| Error::StateIndexError)?;
+            let bytes = strip_ansi_escapes::strip(&s.as_bytes());
+            let str = String::from_utf8(bytes)?;
+            Ok(str)
+        }
 
-    fn get_line_file(&self, mut line: String) -> Option<String> {
-        if self.log_style == LogStyle::OneLine {
-            return None;
-        }
-        if self.graph {
-            remove_graph_symbols(&mut line);
-        }
-        if line.starts_with("diff --git a/") {
-            if let Some((_, file)) = line.split_once(" b/") {
-                return Some(file.to_string());
-            }
-        }
-        return None;
-    }
-
-    fn get_line_line_number(&self, mut line: String) -> Option<usize> {
-        if self.log_style == LogStyle::OneLine {
-            return None;
-        }
-        if self.graph {
-            remove_graph_symbols(&mut line);
-        }
-        if line.starts_with("@@ -") {
-            if let Some((_, line)) = line.split_once(" +") {
-                let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
-                if let Ok(line_number) = line.parse() {
-                    return Some(line_number);
-                };
-            }
-        }
-        return None;
-    }
-
-    fn get_line_commit(&self, mut line: String) -> Option<String> {
-        if self.graph {
-            remove_graph_symbols(&mut line);
-        }
-        match self.log_style {
-            LogStyle::Standard => {
-                let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
-                if first == "commit" {
-                    let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
-                    if !commit.is_empty() {
-                        return Some(commit.to_string());
-                    }
-                }
-            }
-            LogStyle::OneLine => {
-                // assume this is the first word
-                if let Some((commit, _)) = line.split_once(' ') {
-                    return Some(commit.to_string());
-                }
-            }
-            LogStyle::StashPager => {
-                if line.starts_with("stash@{") {
-                    if let Some((commit, _)) = line.split_once(':') {
-                        return Some(commit.to_string());
-                    }
-                }
+        fn get_line_file(&self, mut line: String) -> Option<String> {
+            if self.log_style == LogStyle::OneLine {
                 return None;
             }
-            LogStyle::Reflog => {
+            if self.graph {
+                remove_graph_symbols(&mut line);
+            }
+            if line.starts_with("diff --git a/") {
+                if let Some((_, file)) = line.split_once(" b/") {
+                    return Some(file.to_string());
+                }
+            }
+            return None;
+        }
+
+        fn get_line_line_number(&self, mut line: String) -> Option<usize> {
+            if self.log_style == LogStyle::OneLine {
+                return None;
+            }
+            if self.graph {
+                remove_graph_symbols(&mut line);
+            }
+            if line.starts_with("@@ -") {
+                if let Some((_, line)) = line.split_once(" +") {
+                    let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
+                    if let Ok(line_number) = line.parse() {
+                        return Some(line_number);
+                    };
+                }
+            }
+            return None;
+        }
+
+        fn get_line_commit(&self, mut line: String) -> Option<String> {
+            if self.graph {
+                remove_graph_symbols(&mut line);
+            }
+            match self.log_style {
+                LogStyle::Standard => {
+                    let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
+                    if first == "commit" {
+                        let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
+                        if !commit.is_empty() {
+                            return Some(commit.to_string());
+                        }
+                    }
+                }
+                LogStyle::OneLine => {
+                    // assume this is the first word
+                    if let Some((commit, _)) = line.split_once(' ') {
+                        return Some(commit.to_string());
+                    }
+                }
+                LogStyle::StashPager => {
+                    if line.starts_with("stash@{") {
+                        if let Some((commit, _)) = line.split_once(':') {
+                            return Some(commit.to_string());
+                        }
+                    }
+                    return None;
+                }
+                LogStyle::Reflog => {
                 if line.contains("HEAD@{") {
                     if let Some((commit, _)) = line.split_once(' ') {
                         return Some(commit.to_string());
@@ -338,10 +317,6 @@ impl PagerApp {
                         return Some(commit.to_string());
                     }
                 }
-            }
-            LogStyle::Branch => {
-                let branch = &line[2..].to_string();
-                return Some(branch.to_string());
             }
             LogStyle::Unknown => {
                 return None;

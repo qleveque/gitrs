@@ -66,7 +66,7 @@ fn toggle_stage_git_file(git_file: &mut GitFile, staged_status: StagedStatus) {
 fn parse_git_status(files: &mut HashMap<String, GitFile>, config: &Config) -> Result<(), Error> {
     files.clear();
     let git_status = git_status_output(config);
-    for line in git_status.lines() {
+    for line in git_status?.lines() {
         let filename: String = line[2..].trim().to_string();
         let second: char = line.chars().nth(1).ok_or_else(|| Error::GitParsingError)?;
         let first: char = line.chars().nth(0).ok_or_else(|| Error::GitParsingError)?;

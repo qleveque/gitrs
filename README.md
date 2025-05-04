@@ -8,7 +8,7 @@
 
 ## Features
 
-* Status, Log, Show, Reflog, Diff, Files, Blame, and Stash views
+* Status, Log, Show, Diff, Blame, and Stash views
 * Interactive Git pager with smooth navigation
 * Fully customizable key mappings and mouse-friendly buttons
 * Built-in and shell-integrated actions
@@ -23,13 +23,11 @@ Each view reimagines a common Git workflow, making it faster, simpler, and more 
 
 ```bash
 gitrs status
-gitrs log [...params]
-gitrs show [...params]
-gitrs reflog [...params]
-gitrs diff [...params]
-gitrs stash
-gitrs files [revision]
+gitrs show [revision]
 gitrs blame <file> [line]
+gitrs stash
+gitrs log [...params]
+gitrs diff [...params]
 git config --global core.pager gitrs
 ```
 
@@ -87,14 +85,14 @@ By default, actions can be run at runtime by pressing <kbd>:</kbd> and typing th
     - Blame specific: `next_commit_blame`, `previous_commit_blame`
     - Log specific: `pager_next_commit`, `pager_previous_commit`
     - Stash specific: `stash_drop`, `stash_apply`, `stash_pop`
-    - Others: `nop`, `echo`, `reload`, `quit`, `open_files_app`, `open_show_app`, `open_log_app`
+    - Others: `nop`, `echo`, `reload`, `quit`, `open_show_app`, `open_git_show`, `open_log_app`
 
 ### Scopes
 
 * `global`
-* `files[:(new|modified|deleted)]`
+* `show[:(new|modified|deleted)]`
 * `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
-* `log` `show` `diff` `pager`
+* `log` `diff` `pager`
 * `blame`
 * `stash`
 

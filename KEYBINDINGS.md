@@ -17,27 +17,28 @@
 | | <kbd>:</kbd> | Enter command |
 | | <kbd>n</kbd> | Next search result |
 | | <kbd>N</kbd> | Previous search result |
-| | <kbd>s</kbd> | Open show view |
+| | <kbd>s</kbd> | Open git show |
 | | <kbd>yc</kbd> | Yank commit hash |
 | | <kbd>yf</kbd> | Yank file path |
 | | <kbd>yy</kbd> | Yank text |
-| Log, Show | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-| Log  | <kbd>c</kbd> | Next commit |
+| Log | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
+| | <kbd>c</kbd> | Next commit |
 | | <kbd>C</kbd> | Previous commit |
-| Log, Show, Diff | <kbd>d</kbd> | Git difftool |
-| Log | <kbd>!r</kbd> | Interactive rebase on commit |
-| Branch | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open log view |
-| Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
-| Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
+| | <kbd>!r</kbd> | Interactive rebase on commit |
+| | <kbd>d</kbd> | Git difftool |
+| Diff | <kbd>d</kbd> | Git difftool |
+| Show | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
+| Blame | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
 | | <kbd>l</kbd>/<kbd>→</kbd> | Next blame commit |
 | | <kbd>h</kbd>/<kbd>←</kbd> | Previous blame commit |
 | | <kbd>d</kbd> | Git difftool |
-| Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
+| Stash | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open show view |
+| | <kbd>r</kbd> | Reload |
 | | <kbd>!a</kbd> | Apply stash |
 | | <kbd>!p</kbd> | Pop stash |
 | | <kbd>!d</kbd> | Drop stash |
 | Status | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Stage/unstage file |
-| | <kbd>r</kbd> | Reload status |
+| | <kbd>r</kbd> | Reload |
 | | <kbd>t</kbd> | Toggle stage file |
 | | <kbd>T</kbd> | Toggle stage all |
 | | <kbd>Tab</kbd> | Switch status view |
