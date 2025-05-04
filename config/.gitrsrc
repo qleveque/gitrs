@@ -82,7 +82,7 @@ map pager !r !%(git) rebase -i %(rev)^
 # | | <kbd>d</kbd> | Git difftool |
 map log d !%(git) difftool %(rev)^..%(rev) -- %(file)
 map show d !%(git) difftool %(rev)^..%(rev) -- %(file)
-map diff d !%(git) difftool %(rev)
+map diff d !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
 
 # | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
@@ -166,13 +166,15 @@ map status:staged d !%(git) difftool --staged -- %(file)
 button global " X " quit
 
 # Pager: Log, Show, Reflog, Diff
-button pager " ↵ " open_files_app
+button log " ↵ " open_files_app
+button show " ↵ " open_files_app
+button reflog " ↵ " open_files_app
 button log " ↓ " pager_next_commit
 button log " ↑ " pager_previous_commit
 button log Rebase !%(git) rebase -i %(rev)^
 button log Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
 button show Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
-button diff Diff !%(git) difftool %(rev)
+button diff Diff !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
 
 # Files
 button files " ↵ " !%(git) difftool %(rev)^..%(rev) -- %(file)
