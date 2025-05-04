@@ -34,6 +34,7 @@ pub enum LogStyle {
     Diff,
     Branch,
     Reflog,
+    Stash,
     Unknown,
 }
 
@@ -129,6 +130,8 @@ impl PagerApp {
             Some(_) => {
                 if first_line.contains("HEAD@{0}:") {
                     LogStyle::Reflog
+                } else if first_line.starts_with("stash@{0}:") {
+                    LogStyle::Stash
                 } else {
                     LogStyle::OneLine
                 }
@@ -277,15 +280,21 @@ impl PagerApp {
             }
             LogStyle::OneLine => {
                 // assume this is the first word
-                let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
-                if !commit.is_empty() {
+                if let Some((commit, _)) = line.split_once(' ') {
                     return Some(commit.to_string());
                 }
             }
             LogStyle::Reflog => {
                 if line.contains("HEAD@{") {
-                    let (commit, _) = line.split_once(' ').unwrap_or(("", ""));
-                    if !commit.is_empty() {
+                    if let Some((commit, _)) = line.split_once(' ') {
+                        return Some(commit.to_string());
+                    }
+                }
+                return None;
+            }
+            LogStyle::Stash => {
+                if line.starts_with("stash@{") {
+                    if let Some((commit, _)) = line.split_once(':') {
                         return Some(commit.to_string());
                     }
                 }
