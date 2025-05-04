@@ -66,28 +66,29 @@ map global yf !echo '%(file)' | %(clip)
 # | | <kbd>yy</kbd> | Yank text |
 map global yy !echo '%(text)' | %(clip)
 
-# | Log, Show, Reflog, Diff | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
-map pager <cr> open_files_app
-map pager <rclick> open_files_app
-# | Branch | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open log view |
-map branch <cr> open_log_app
-map branch <rclick> open_log_app
+# | Log, Show | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open files view |
+map log <cr> open_files_app
+map log <rclick> open_files_app
+map show <cr> open_files_app
+map show <rclick> open_files_app
 
-# | Log, Reflog | <kbd>c</kbd> | Next commit |
+# | Log  | <kbd>c</kbd> | Next commit |
 map log c pager_next_commit
-map reflog c pager_next_commit
 
 # | | <kbd>C</kbd> | Previous commit |
 map log C pager_previous_commit
-map reflog C pager_previous_commit
 
-# | | <kbd>!r</kbd> | Interactive rebase on commit |
-map log !r !%(git) rebase -i %(rev)^
-
-# | Log, Show, Reflog, Diff | <kbd>d</kbd> | Git difftool |
+# | Log, Show, Diff | <kbd>d</kbd> | Git difftool |
 map log d !%(git) difftool %(rev)^..%(rev) -- %(file)
 map show d !%(git) difftool %(rev)^..%(rev) -- %(file)
 map diff d !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
+
+# | Log | <kbd>!r</kbd> | Interactive rebase on commit |
+map log !r !%(git) rebase -i %(rev)^
+
+# | Branch | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Open log view |
+map branch <cr> open_log_app
+map branch <rclick> open_log_app
 
 # | Files | <kbd>Enter</kbd>/<kbd>Right Click</kbd> | Git difftool |
 map files <cr> !%(git) difftool %(rev)^..%(rev) -- %(file)
@@ -170,17 +171,14 @@ map status:staged d !%(git) difftool --staged -- %(file)
 # Buttons
 button global " X " quit
 
-# Pager: Log, Show, Reflog, Diff
+# Pager: Log, Show, Diff
 button log " ↵ " open_files_app
 button show " ↵ " open_files_app
 button branch " ↵ " open_log_app
-button reflog " ↵ " open_files_app
 button log " ↓ " pager_next_commit
 button log " ↑ " pager_previous_commit
 button log Rebase !%(git) rebase -i %(rev)^
 button log Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
-button reflog " ↓ " pager_next_commit
-button reflog " ↑ " pager_previous_commit
 button show Diff !%(git) difftool %(rev)^..%(rev) -- %(file)
 button diff Diff !%(git) difftool %(rev) 2>/dev/null || %(git) difftool -- %(file)
 

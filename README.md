@@ -94,7 +94,7 @@ By default, actions can be run at runtime by pressing <kbd>:</kbd> and typing th
 * `global`
 * `files[:(new|modified|deleted)]`
 * `status[:(staged|unstaged)[:(new|modified|deleted|conflicted)]]`
-* `pager` `show` `log` `reflog` `diff`
+* `log` `show` `diff` `pager`
 * `blame`
 * `stash`
 

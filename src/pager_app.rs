@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{BufRead, BufReader, Lines};
 use std::path::Path;
 use std::process::ChildStdout;
@@ -11,8 +12,9 @@ use crate::app_state::{AppState, NotifChannel};
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_pager_output, set_git_dir};
+use crate::git::{git_pager_output, is_branch, is_valid_git_rev, set_git_dir};
 use crate::pager_widget::PagerWidget;
+use crate::ui::clean_buggy_characters;
 
 use ratatui::layout::Rect;
 
@@ -34,8 +36,24 @@ pub enum LogStyle {
     Diff,
     Branch,
     Reflog,
-    Stash,
+    // pagers
+    StashPager,
     Unknown,
+}
+
+impl fmt::Display for LogStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match self {
+            LogStyle::Standard => "log",
+            LogStyle::OneLine => "oneline log",
+            LogStyle::Diff => "diff",
+            LogStyle::Branch => "branch",
+            LogStyle::Reflog => "reflog",
+            LogStyle::StashPager => "stash pager",
+            LogStyle::Unknown => "pager",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 pub enum PagerCommand {
@@ -62,29 +80,68 @@ pub enum Input {
     Stdin,
 }
 
+fn remove_graph_symbols(line: &mut String) {
+    // remove | and * graph chars
+    loop {
+        if let Some(first_char) = line.chars().next() {
+            let second_char = line.chars().next();
+            if first_char == '*' || first_char == '|' || second_char == Some(' ') {
+                *line = line.chars().skip(2).collect();
+                continue;
+            }
+        }
+        break;
+    }
+}
+
+fn guess_log_style(line: &mut String) -> LogStyle {
+    match line.split(' ').next() {
+        Some("") => LogStyle::Branch,
+        Some("commit") => LogStyle::Standard,
+        Some("diff") => LogStyle::Diff,
+        Some(rev) => {
+            if line.contains("HEAD@{0}:") {
+                LogStyle::Reflog
+            } else if line.starts_with("stash@{0}:") {
+                LogStyle::StashPager
+            } else if line.contains(" 1) ") {
+                LogStyle::Unknown
+            } else {
+                if is_valid_git_rev(rev) {
+                    LogStyle::OneLine
+                } else {
+                    LogStyle::Unknown
+                }
+            }
+        }
+        None => LogStyle::Unknown,
+    }
+}
+
 impl PagerApp {
     pub fn new(pager_command: Option<PagerCommand>) -> Result<Self, Error> {
         let state = AppState::new()?;
         let git_exe = state.config.git_exe.clone();
-        let mut mapping_scopes = vec![MappingScope::Pager];
+        let mut log_style = LogStyle::Unknown;
+
         let mut graph = false;
         let mut iterator = match pager_command {
             Some(pager_command) => {
-                let (git_command, args, scope) = match pager_command {
-                    PagerCommand::Log(args) => ("log", args, MappingScope::Log),
-                    PagerCommand::Show(args) => ("show", args, MappingScope::Show),
-                    PagerCommand::Reflog(args) => ("reflog", args, MappingScope::Reflog),
-                    PagerCommand::Diff(args) => ("diff", args, MappingScope::Diff),
-                    PagerCommand::Branch(args) => ("branch", args, MappingScope::Branch),
+                let (git_command, args, style) = match pager_command {
+                    PagerCommand::Log(args) => ("log", args, LogStyle::Unknown),
+                    PagerCommand::Show(args) => ("show", args, LogStyle::Standard),
+                    PagerCommand::Reflog(args) => ("reflog", args, LogStyle::Reflog),
+                    PagerCommand::Diff(args) => ("diff", args, LogStyle::Diff),
+                    PagerCommand::Branch(args) => ("branch", args, LogStyle::Branch),
                 };
-                mapping_scopes.insert(0, scope);
+                log_style = style;
                 let bufreader: BufReader<ChildStdout> =
                     git_pager_output(git_command, git_exe, args)?;
                 Input::Command(bufreader.lines())
             }
             None => Input::Stdin,
         };
-        let first_line_ansi = match iterator {
+        let mut first_line_ansi = match iterator {
             Input::Command(ref mut lines) => lines.by_ref().next(),
             Input::Stdin => {
                 let stdin = io::stdin();
@@ -93,63 +150,45 @@ impl PagerApp {
                 lines.next()
             }
         }
-        .ok_or_else(|| Error::GlobalError("no data provided to the pager".to_string()))??
-        .replace("\t", "    ")
-        .replace("\r", "^M");
+        .ok_or_else(|| Error::GlobalError("no data provided to the pager".to_string()))??;
+        first_line_ansi = clean_buggy_characters(&first_line_ansi);
 
-        let bytes = strip_ansi_escapes::strip(&first_line_ansi.as_bytes());
-        let first_line = String::from_utf8(bytes)?;
+        let first_line = String::from_utf8(strip_ansi_escapes::strip(&first_line_ansi.as_bytes()))?;
 
-        let mut words = first_line.split(' ');
-        let log_style = match words.next() {
-            Some("") => {
-                let branch = words.next();
-                let end = words.next();
-                if branch.is_some() && end.is_none() {
-                    LogStyle::Branch
+        // Test if there is a graph mode
+        let mut first_line_words = first_line.split(' ');
+        if Some("*") == first_line_words.next() {
+            if matches!(iterator, Input::Stdin) {
+                if is_branch(first_line_words.next().unwrap_or("")) {
+                    log_style = LogStyle::Branch;
                 } else {
-                    LogStyle::Unknown
-                }
-            }
-            Some("commit") => LogStyle::Standard,
-            Some("diff") => LogStyle::Diff,
-            Some("*") => match words.next() {
-                Some("commit") => {
                     graph = true;
-                    LogStyle::Standard
                 }
-                Some(_) => match words.next() {
-                    None => LogStyle::Branch,
-                    Some(_) => {
-                        graph = true;
-                        LogStyle::OneLine
-                    }
-                },
-                None => LogStyle::Unknown,
-            },
-            Some(_) => {
-                if first_line.contains("HEAD@{0}:") {
-                    LogStyle::Reflog
-                } else if first_line.starts_with("stash@{0}:") {
-                    LogStyle::Stash
-                } else {
-                    LogStyle::OneLine
-                }
-            }
-            None => LogStyle::Unknown,
-        };
-
-        if matches!(iterator, Input::Stdin) {
-            if log_style == LogStyle::Diff {
-                mapping_scopes.insert(0, MappingScope::Diff);
-            } else if log_style == LogStyle::Branch {
-                mapping_scopes.insert(0, MappingScope::Branch);
-            } else if log_style == LogStyle::Reflog {
-                mapping_scopes.insert(0, MappingScope::Reflog);
             } else {
-                mapping_scopes.insert(0, MappingScope::Log);
+                if log_style != LogStyle::Branch {
+                    graph = true;
+                }
             }
         }
+
+        let mut line = first_line.clone();
+        if graph {
+            remove_graph_symbols(&mut line);
+        }
+        if log_style == LogStyle::Unknown {
+            log_style = guess_log_style(&mut line);
+        }
+
+        let mapping_scope = match log_style {
+            LogStyle::Diff => MappingScope::Diff,
+            LogStyle::Branch => MappingScope::Branch,
+            LogStyle::Reflog => MappingScope::Log,
+            LogStyle::Standard => MappingScope::Log,
+            LogStyle::OneLine => MappingScope::Log,
+            LogStyle::StashPager => MappingScope::Log,
+            _ => MappingScope::Pager,
+        };
+        let mapping_scopes = vec![mapping_scope];
 
         let lines = Arc::new(Mutex::new(vec![first_line_ansi]));
         let lines_clone = Arc::clone(&lines);
@@ -173,7 +212,7 @@ impl PagerApp {
                     match next {
                         Some(res_line) => {
                             chunk.push(match res_line {
-                                Ok(line) => line.replace("\t", "    ").replace("\r", "^M"),
+                                Ok(line) => clean_buggy_characters(&line),
                                 Err(_) => "\x1b[31m/!\\ *** ERROR *** /!\\: gitrs could not read that line\x1b[0m".to_string(),
                             })
                         }
@@ -222,26 +261,13 @@ impl PagerApp {
         Ok(str)
     }
 
-    fn remove_graph_symbols(&self, line: &mut String) {
-        // remove | and * graph chars
-        if self.graph {
-            loop {
-                if let Some(first_char) = line.chars().next() {
-                    if first_char == '*' || first_char == '|' {
-                        *line = line.chars().skip(2).collect();
-                        continue;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
     fn get_line_file(&self, mut line: String) -> Option<String> {
         if self.log_style == LogStyle::OneLine {
             return None;
         }
-        self.remove_graph_symbols(&mut line);
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
         if line.starts_with("diff --git a/") {
             if let Some((_, file)) = line.split_once(" b/") {
                 return Some(file.to_string());
@@ -254,7 +280,9 @@ impl PagerApp {
         if self.log_style == LogStyle::OneLine {
             return None;
         }
-        self.remove_graph_symbols(&mut line);
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
         if line.starts_with("@@ -") {
             if let Some((_, line)) = line.split_once(" +") {
                 let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
@@ -267,7 +295,9 @@ impl PagerApp {
     }
 
     fn get_line_commit(&self, mut line: String) -> Option<String> {
-        self.remove_graph_symbols(&mut line);
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
         match self.log_style {
             LogStyle::Standard => {
                 let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
@@ -284,17 +314,17 @@ impl PagerApp {
                     return Some(commit.to_string());
                 }
             }
-            LogStyle::Reflog => {
-                if line.contains("HEAD@{") {
-                    if let Some((commit, _)) = line.split_once(' ') {
+            LogStyle::StashPager => {
+                if line.starts_with("stash@{") {
+                    if let Some((commit, _)) = line.split_once(':') {
                         return Some(commit.to_string());
                     }
                 }
                 return None;
             }
-            LogStyle::Stash => {
-                if line.starts_with("stash@{") {
-                    if let Some((commit, _)) = line.split_once(':') {
+            LogStyle::Reflog => {
+                if line.contains("HEAD@{") {
+                    if let Some((commit, _)) = line.split_once(' ') {
                         return Some(commit.to_string());
                     }
                 }
@@ -349,7 +379,12 @@ impl GitApp for PagerApp {
         self.view_model.rect = rect;
         let idx = self.idx().unwrap_or(0);
         let idx = idx.checked_add(1).unwrap_or(0);
-        let message = format!("line {} of {}", idx, self.lines.lock().unwrap().len());
+        let message = format!(
+            "{} - line {} of {}",
+            self.log_style,
+            idx,
+            self.lines.lock().unwrap().len(),
+        );
         self.notif(NotifChannel::Line, message);
         let scroll_step = self.state.config.scroll_step;
         self.view_model.list = PagerWidget::new(
@@ -381,7 +416,9 @@ impl GitApp for PagerApp {
             let mut line = self
                 .get_stripped_line(idx)
                 .map_err(|_| Error::GitParsingError)?;
-            self.remove_graph_symbols(&mut line);
+            if self.graph {
+                remove_graph_symbols(&mut line);
+            }
             let stat_re =
                 Regex::new(r"^\s*(?P<file>[^|]+)\s+\|\s+(?P<changes>\d+)\s+(?P<diff>[+\-]+)")
                     .unwrap();

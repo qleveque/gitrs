@@ -47,3 +47,7 @@ pub fn date_to_color(date: &str) -> Color {
     let b = (200.0 * (1.0 - clamped) + 80.0 * clamped) as u8;
     Color::Rgb(r, g, b)
 }
+
+pub fn clean_buggy_characters(line: &String) -> String {
+    line.replace("\t", "    ").replace("\r", "^M")
+}
