@@ -1,5 +1,17 @@
 use chrono::{NaiveDate, Utc};
-use ratatui::style::{Color, Modifier, Style};
+use std::collections::HashMap;
+
+
+use crate::{action::Action, app_state::NotifChannel, config::Button};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Position, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Text},
+    widgets::{Clear, Paragraph, Widget},
+    Frame,
+};
+
+pub const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
 
 pub fn highlight_style() -> Style {
     Style::from(Color::Rgb(255, 255, 255)).bg(Color::DarkGray)
@@ -50,4 +62,131 @@ pub fn date_to_color(date: &str) -> Color {
 
 pub fn clean_buggy_characters(line: &String) -> String {
     line.replace("\t", "    ").replace("\r", "^M")
+}
+
+pub fn display_search_bar(
+    search_string: &str,
+    search_reverse: bool,
+    chunk: &mut Rect,
+    frame: &mut Frame,
+) {
+    let search_string = match search_reverse {
+        false => format!("/{}│", search_string),
+        true => format!("?{}│", search_string),
+    };
+    let paragraph = Paragraph::new(search_string.clone());
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(*chunk);
+    frame.render_widget(Clear, chunks[1]);
+    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+    *chunk = chunks[0];
+}
+
+pub fn display_cmd_line(command_string: &str, chunk: &mut Rect, frame: &mut Frame) {
+    let command_string = format!(":{}│", command_string);
+    let paragraph = Paragraph::new(command_string);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(*chunk);
+    frame.render_widget(Clear, chunks[1]);
+    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+    *chunk = chunks[0];
+}
+
+pub fn display_notifications(
+    notifications: &HashMap<NotifChannel, String>,
+    loading_char: char,
+    loaded: bool,
+    chunk: &mut Rect,
+    frame: &mut Frame,
+) {
+    if notifications.is_empty() {
+        return;
+    }
+    let mut notif_vec: Vec<_> = notifications.iter().collect();
+    notif_vec.sort_by_key(|(notif_channel, _)| *notif_channel);
+
+    let lines: Vec<Line> = notif_vec
+        .into_iter()
+        .map(|(notif_channel, message)| {
+            let line_style = match notif_channel {
+                NotifChannel::Error => Style::from(Color::Red),
+                _ => Style::from(Color::Blue),
+            };
+            let mut message = message.clone();
+            match notif_channel {
+                NotifChannel::Search => {
+                    message.push(' ');
+                    message.push(loading_char);
+                }
+                NotifChannel::Line if !loaded => {
+                    message.push_str("... ");
+                    message.push(loading_char);
+                }
+                _ => (),
+            };
+            Line::styled(message.to_string(), line_style)
+        })
+        .collect();
+    let paragraph = Paragraph::new(Text::from(lines)).style(bar_style());
+
+    let len = notifications.len() as u16;
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(len)])
+        .split(*chunk);
+    frame.render_widget(Clear, chunks[1]);
+    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+    *chunk = chunks[0];
+}
+
+pub fn display_menu_bar(
+    buttons: &Vec<Button>,
+    mouse_position: Position,
+    mouse_down: bool,
+    chunk: &mut Rect,
+    frame: &mut Frame
+) -> Vec<(Rect, Action)> {
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(0)])
+        .split(*chunk);
+
+    let mut constraints = vec![Constraint::Length(1)];
+    for button in buttons {
+        constraints.push(Constraint::Length(button.0.chars().count() as u16));
+        constraints.push(Constraint::Length(1));
+    }
+
+    let horizontal_chunks = Layout::default()
+        .constraints(constraints)
+        .direction(Direction::Horizontal)
+        .split(chunks[0]);
+
+    let paragraph = Paragraph::default().style(bar_style());
+    Widget::render(&paragraph, chunks[0], frame.buffer_mut());
+
+    let mut region_to_action = Vec::new();
+
+    for (idx, button) in buttons.iter().enumerate() {
+        let chunk = horizontal_chunks[2 * idx + 1];
+        let style = if chunk.contains(mouse_position) {
+            if mouse_down {
+                clicked_button_style()
+            } else {
+                hovered_button_style()
+            }
+        } else {
+            button_style()
+        };
+        let paragraph = Paragraph::new(button.0.to_string()).style(style);
+        Widget::render(&paragraph, chunk, frame.buffer_mut());
+        region_to_action.push((chunk, button.1.clone()))
+    }
+    *chunk = chunks[1];
+    region_to_action
 }

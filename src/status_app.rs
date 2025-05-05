@@ -93,30 +93,16 @@ fn parse_git_status(files: &mut HashMap<String, GitFile>, config: &Config) -> Re
 
 fn list_to_draw<'a>(
     table: &'a Vec<(FileStatus, String)>,
-    width: usize,
     color: Color,
     title: String,
     config: &'a Config,
 ) -> List<'a> {
     let style = Style::from(color);
-    // remove margins
-    let w = width - 2;
 
     let r: Vec<ListItem> = table
         .iter()
         .map(|item| {
-            let filename = item.1.clone();
-            let too_long = w > 5 && filename.len() + "X ".len() > w;
-            let displayed_filename: String = if too_long {
-                // Add leading "..." if too long
-                format!("...{}", &filename[filename.len() - (w - "X ...".len())..])
-            } else {
-                filename.clone() // Use full filename if it fits
-            };
-
-            let file_status = item.0;
-            let label = format!("{} {}", file_status.character(), displayed_filename);
-            ListItem::new(label.to_string()).style(style)
+            ListItem::new(format!("{} {}", item.0.character(), item.1)).style(style)
         })
         .collect();
     return List::new(r)
@@ -173,8 +159,8 @@ impl StatusApp {
         Ok(filename.to_string())
     }
 
-    fn get_mut_git_file(&mut self) -> Result<GitFile, Error> {
-        let git_file = match self.git_files.get_mut(&self.get_filename()?) {
+    fn get_git_file(&self) -> Result<GitFile, Error> {
+        let git_file = match self.git_files.get(&self.get_filename()?) {
             Some(git_file) => git_file.clone(),
             None => return Err(Error::StateIndexError),
         };
@@ -260,7 +246,6 @@ impl GitApp for StatusApp {
 
         let top_list = list_to_draw(
             &self.unstaged_table,
-            chunks[0].width as usize,
             Color::Red,
             "Not staged:".to_string(),
             &self.state.config,
@@ -278,7 +263,6 @@ impl GitApp for StatusApp {
 
         let bottom_list = list_to_draw(
             &self.staged_table,
-            chunks[1].width as usize,
             Color::Green,
             "Staged:".to_string(),
             &self.state.config,
@@ -309,8 +293,8 @@ impl GitApp for StatusApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
-        let git_file = match self.get_mut_git_file() {
+    fn get_mapping_fields(&self) -> Vec<MappingScope> {
+        let git_file = match self.get_git_file() {
             Ok(git_file) => git_file,
             Err(_) => return vec![MappingScope::Status(None, None)],
         };
@@ -348,7 +332,7 @@ impl GitApp for StatusApp {
             StagedStatus::Staged => self.view_model.bottom_rect,
         };
         let table = self.get_current_table();
-        self.standard_on_scroll(down, rect.height as usize, table.len());
+        self.on_scroll_generic(down, rect.height as usize, table.len());
     }
 
     fn run_action(
@@ -410,7 +394,7 @@ impl GitApp for StatusApp {
                     StagedStatus::Unstaged => self.view_model.top_rect,
                     StagedStatus::Staged => self.view_model.bottom_rect,
                 };
-                self.run_generic_action(action, rect.height as usize, terminal)?;
+                self.run_action_generic(action, rect.height as usize, terminal)?;
             }
         }
         if !self.tables_are_empty() && 0 == self.get_current_table().len() {

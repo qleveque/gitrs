@@ -117,7 +117,7 @@ impl GitApp for StashApp {
         self.highlight_search(frame, rect);
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+    fn get_mapping_fields(&self) -> Vec<MappingScope> {
         vec![MappingScope::Stash]
     }
 
@@ -130,7 +130,7 @@ impl GitApp for StashApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        self.run_generic_action(action, self.view_model.height, terminal)?;
+        self.run_action_generic(action, self.view_model.height, terminal)?;
         return Ok(());
     }
 
@@ -144,7 +144,7 @@ impl GitApp for StashApp {
     }
 
     fn on_scroll(&mut self, down: bool) {
-        self.standard_on_scroll(
+        self.on_scroll_generic(
             down,
             self.view_model.rect.height as usize,
             self.stashes.len(),

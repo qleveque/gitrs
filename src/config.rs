@@ -193,7 +193,7 @@ impl Config {
         merged.into_iter().collect()
     }
 
-    pub fn get_buttons(&self, mapping_scope: MappingScope) -> Vec<(String, Action)> {
+    pub fn get_buttons(&self, mapping_scope: MappingScope) -> Vec<Button> {
         self.user_buttons
             .get(&mapping_scope)
             .into_iter()

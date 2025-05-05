@@ -4,10 +4,10 @@ mod app_state;
 mod blame_app;
 mod config;
 mod errors;
-mod show_app;
 mod git;
 mod pager_app;
 mod pager_widget;
+mod show_app;
 mod stash_app;
 mod status_app;
 mod ui;
@@ -19,8 +19,8 @@ use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
 
 use errors::Error;
-use show_app::ShowApp;
 use pager_app::{PagerApp, PagerCommand};
+use show_app::ShowApp;
 use stash_app::StashApp;
 use status_app::StatusApp;
 

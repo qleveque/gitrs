@@ -4,7 +4,7 @@ use crate::app_state::AppState;
 
 use crate::config::MappingScope;
 use crate::errors::Error;
-use crate::git::{git_show_output, git_parse_commit, set_git_dir, Commit, FileStatus};
+use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
 
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
@@ -169,16 +169,13 @@ impl GitApp for ShowApp {
         );
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+    fn get_mapping_fields(&self) -> Vec<MappingScope> {
         let file = self
             .commit
             .files
             .get(self.idx().unwrap_or(usize::MAX))
             .map(|(a, _)| a);
-        vec![
-            MappingScope::Show(file.copied()),
-            MappingScope::Show(None),
-        ]
+        vec![MappingScope::Show(file.copied()), MappingScope::Show(None)]
     }
 
     fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
@@ -197,7 +194,7 @@ impl GitApp for ShowApp {
         action: &Action,
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
-        self.run_generic_action(action, self.view_model.files_rect.height as usize, terminal)?;
+        self.run_action_generic(action, self.view_model.files_rect.height as usize, terminal)?;
         return Ok(());
     }
 
@@ -215,7 +212,7 @@ impl GitApp for ShowApp {
     }
 
     fn on_scroll(&mut self, down: bool) {
-        self.standard_on_scroll(
+        self.on_scroll_generic(
             down,
             self.view_model.files_rect.height as usize,
             self.commit.files.len(),

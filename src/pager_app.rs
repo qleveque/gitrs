@@ -71,7 +71,7 @@ pub struct PagerApp {
     view_model: PagerAppViewModel,
 }
 
-pub enum Input {
+pub enum LogInput {
     Command(Lines<BufReader<ChildStdout>>),
     Stdin,
 }
@@ -130,13 +130,13 @@ impl PagerApp {
                 log_style = style;
                 let bufreader: BufReader<ChildStdout> =
                     git_pager_output(git_command, git_exe, args)?;
-                Input::Command(bufreader.lines())
+                LogInput::Command(bufreader.lines())
             }
-            None => Input::Stdin,
+            None => LogInput::Stdin,
         };
         let mut first_line_ansi = match iterator {
-            Input::Command(ref mut lines) => lines.by_ref().next(),
-            Input::Stdin => {
+            LogInput::Command(ref mut lines) => lines.by_ref().next(),
+            LogInput::Stdin => {
                 let stdin = io::stdin();
                 let handle = stdin.lock();
                 let mut lines = handle.lines();
@@ -178,15 +178,15 @@ impl PagerApp {
         thread::spawn(move || {
             let n = 100;
             let mut stdin_lines = match iterator {
-                Input::Stdin => Some(io::stdin().lock().lines()),
-                Input::Command(_) => None,
+                LogInput::Stdin => Some(io::stdin().lock().lines()),
+                LogInput::Command(_) => None,
             };
             loop {
                 let mut chunk = Vec::with_capacity(n);
                 for _ in 0..n {
                     let next = match iterator {
-                        Input::Command(ref mut lines) => lines.by_ref().next(),
-                        Input::Stdin => stdin_lines.as_mut().unwrap().next(),
+                        LogInput::Command(ref mut lines) => lines.by_ref().next(),
+                        LogInput::Stdin => stdin_lines.as_mut().unwrap().next(),
                     };
                     match next {
                         Some(res_line) => {
@@ -207,101 +207,101 @@ impl PagerApp {
         });
 
         let original_dir = env::current_dir()?;
-            set_git_dir(&state.config)?;
+        set_git_dir(&state.config)?;
 
-            let mut r = Self {
-                state,
-                mapping_scopes,
-                lines,
-                log_style,
-                loaded,
-                original_dir,
-                graph,
-                view_model: PagerAppViewModel {
-                    list: PagerWidget::default(),
-                    rect: Rect::default(),
-                    scroll: None,
-                },
-            };
-            r.state.list_state.select_first();
-            Ok(r)
-        }
+        let mut r = Self {
+            state,
+            mapping_scopes,
+            lines,
+            log_style,
+            loaded,
+            original_dir,
+            graph,
+            view_model: PagerAppViewModel {
+                list: PagerWidget::default(),
+                rect: Rect::default(),
+                scroll: None,
+            },
+        };
+        r.state.list_state.select_first();
+        Ok(r)
+    }
 
-        fn get_stripped_line(&self, idx: usize) -> Result<String, Error> {
-            let s = self
-                .lines
-                .lock()
-                .unwrap()
-                .get(idx)
-                .cloned()
-                .ok_or_else(|| Error::StateIndexError)?;
-            let bytes = strip_ansi_escapes::strip(&s.as_bytes());
-            let str = String::from_utf8(bytes)?;
-            Ok(str)
-        }
+    fn get_stripped_line(&self, idx: usize) -> Result<String, Error> {
+        let s = self
+            .lines
+            .lock()
+            .unwrap()
+            .get(idx)
+            .cloned()
+            .ok_or_else(|| Error::StateIndexError)?;
+        let bytes = strip_ansi_escapes::strip(&s.as_bytes());
+        let str = String::from_utf8(bytes)?;
+        Ok(str)
+    }
 
-        fn get_line_file(&self, mut line: String) -> Option<String> {
-            if self.log_style == LogStyle::OneLine {
-                return None;
-            }
-            if self.graph {
-                remove_graph_symbols(&mut line);
-            }
-            if line.starts_with("diff --git a/") {
-                if let Some((_, file)) = line.split_once(" b/") {
-                    return Some(file.to_string());
-                }
-            }
+    fn file_in_line(&self, mut line: String) -> Option<String> {
+        if self.log_style == LogStyle::OneLine {
             return None;
         }
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
+        if line.starts_with("diff --git a/") {
+            if let Some((_, file)) = line.split_once(" b/") {
+                return Some(file.to_string());
+            }
+        }
+        return None;
+    }
 
-        fn get_line_line_number(&self, mut line: String) -> Option<usize> {
-            if self.log_style == LogStyle::OneLine {
-                return None;
-            }
-            if self.graph {
-                remove_graph_symbols(&mut line);
-            }
-            if line.starts_with("@@ -") {
-                if let Some((_, line)) = line.split_once(" +") {
-                    let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
-                    if let Ok(line_number) = line.parse() {
-                        return Some(line_number);
-                    };
-                }
-            }
+    fn line_number_in_line(&self, mut line: String) -> Option<usize> {
+        if self.log_style == LogStyle::OneLine {
             return None;
         }
-
-        fn get_line_commit(&self, mut line: String) -> Option<String> {
-            if self.graph {
-                remove_graph_symbols(&mut line);
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
+        if line.starts_with("@@ -") {
+            if let Some((_, line)) = line.split_once(" +") {
+                let line: String = line.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if let Ok(line_number) = line.parse() {
+                    return Some(line_number);
+                };
             }
-            match self.log_style {
-                LogStyle::Standard => {
-                    let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
-                    if first == "commit" {
-                        let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
-                        if !commit.is_empty() {
-                            return Some(commit.to_string());
-                        }
-                    }
-                }
-                LogStyle::OneLine => {
-                    // assume this is the first word
-                    if let Some((commit, _)) = line.split_once(' ') {
+        }
+        return None;
+    }
+
+    fn commit_in_line(&self, mut line: String) -> Option<String> {
+        if self.graph {
+            remove_graph_symbols(&mut line);
+        }
+        match self.log_style {
+            LogStyle::Standard => {
+                let (first, rest) = line.split_once(' ').unwrap_or(("", ""));
+                if first == "commit" {
+                    let (commit, _) = rest.split_once(' ').unwrap_or((rest, ""));
+                    if !commit.is_empty() {
                         return Some(commit.to_string());
                     }
                 }
-                LogStyle::StashPager => {
-                    if line.starts_with("stash@{") {
-                        if let Some((commit, _)) = line.split_once(':') {
-                            return Some(commit.to_string());
-                        }
-                    }
-                    return None;
+            }
+            LogStyle::OneLine => {
+                // assume this is the first word
+                if let Some((commit, _)) = line.split_once(' ') {
+                    return Some(commit.to_string());
                 }
-                LogStyle::Reflog => {
+            }
+            LogStyle::StashPager => {
+                if line.starts_with("stash@{") {
+                    if let Some((commit, _)) = line.split_once(':') {
+                        return Some(commit.to_string());
+                    }
+                }
+                return None;
+            }
+            LogStyle::Reflog => {
                 if line.contains("HEAD@{") {
                     if let Some((commit, _)) = line.split_once(' ') {
                         return Some(commit.to_string());
@@ -360,7 +360,7 @@ impl GitApp for PagerApp {
             idx,
             self.lines.lock().unwrap().len(),
         );
-        self.notif(NotifChannel::Line, message);
+        self.notif(NotifChannel::Line, Some(message));
         let scroll_step = self.state.config.scroll_step;
         self.view_model.list = PagerWidget::new(
             &self.lines.lock().unwrap(),
@@ -375,7 +375,7 @@ impl GitApp for PagerApp {
         self.highlight_search(frame, rect);
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+    fn get_mapping_fields(&self) -> Vec<MappingScope> {
         self.mapping_scopes.clone()
     }
 
@@ -412,7 +412,7 @@ impl GitApp for PagerApp {
                 .get_stripped_line(idx)
                 .map_err(|_| Error::GitParsingError)?;
             if file.is_none() {
-                if let Some(line_file) = self.get_line_file(line.clone()) {
+                if let Some(line_file) = self.file_in_line(line.clone()) {
                     file = Some(line_file);
                     if self.log_style == LogStyle::Diff {
                         break;
@@ -420,9 +420,9 @@ impl GitApp for PagerApp {
                 }
             }
             if line_number.is_none() {
-                line_number = self.get_line_line_number(line.clone());
+                line_number = self.line_number_in_line(line.clone());
             }
-            if let Some(line_commit) = self.get_line_commit(line) {
+            if let Some(line_commit) = self.commit_in_line(line) {
                 commit = Some(line_commit);
                 if self.log_style != LogStyle::Diff {
                     break;
@@ -449,7 +449,7 @@ impl GitApp for PagerApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.get_line_commit(line) {
+                    if let Some(_) = self.commit_in_line(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
@@ -467,7 +467,7 @@ impl GitApp for PagerApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.get_line_commit(line) {
+                    if let Some(_) = self.commit_in_line(line) {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
@@ -475,7 +475,7 @@ impl GitApp for PagerApp {
                 *self.state.list_state.offset_mut() = self.idx()?;
             }
             action => {
-                self.run_generic_action(action, self.view_model.rect.height as usize, terminal)?;
+                self.run_action_generic(action, self.view_model.rect.height as usize, terminal)?;
             }
         }
         return Ok(());

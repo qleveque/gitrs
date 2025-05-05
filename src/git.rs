@@ -64,6 +64,17 @@ impl FromStr for StagedStatus {
     }
 }
 
+pub struct CommitInBlame {
+    pub hash: String,
+    pub author: String,
+    pub date: String,
+}
+
+pub struct Stash {
+    pub date: String,
+    pub title: String,
+}
+
 #[derive(PartialEq, Clone, Copy)]
 pub enum GitOp {
     Add,
@@ -79,38 +90,11 @@ pub struct GitFile {
     init_staged_status: FileStatus,
 }
 
-pub struct CommitRef {
-    pub hash: String,
-    pub author: String,
-    pub date: String,
-}
-
-pub struct Stash {
-    pub date: String,
-    pub title: String,
-}
-
-impl CommitRef {
-    pub fn new(hash: String, author: String, date: String) -> Self {
-        CommitRef { hash, author, date }
-    }
-}
-
 #[derive(Clone)]
 pub struct Commit {
     pub metadata: String,
     pub files: Vec<(FileStatus, String)>,
     pub hash: String,
-}
-
-impl Commit {
-    pub fn new(metadata: String, files: Vec<(FileStatus, String)>, hash: String) -> Self {
-        Commit {
-            metadata,
-            files,
-            hash,
-        }
-    }
 }
 
 impl GitFile {
@@ -173,7 +157,11 @@ pub fn git_status_output(config: &Config) -> Result<String, Error> {
     Ok(output_text)
 }
 
-pub fn git_blame_output(file: String, revision: Option<String>, config: &Config) -> Result<String, Error> {
+pub fn git_blame_output(
+    file: String,
+    revision: Option<String>,
+    config: &Config,
+) -> Result<String, Error> {
     let mut args: Vec<String> = vec!["blame".to_string()];
     if let Some(rev) = revision {
         args.push(rev);
@@ -243,7 +231,11 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
         }
     }
 
-    let commit = Commit::new(metadata.join("\n"), files, commit_hash.to_string());
+    let commit = Commit {
+        metadata: metadata.join("\n"),
+        files,
+        hash: commit_hash.to_string(),
+    };
     Ok(commit)
 }
 
@@ -370,9 +362,7 @@ pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
     }
 }
 
-// Done by chatgpt
 pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String, Error> {
-    // Run: git diff --name-status rev^ rev
     let output = Command::new("git")
         .args(["diff", "--name-status", &format!("{rev}^"), rev])
         .output()?;
@@ -392,11 +382,9 @@ pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String
         }
     }
 
-    // No rename found; return the same name
     Ok(current_filename.to_string())
 }
 
-// Done by chatgpt
 pub fn is_valid_git_rev(rev: &str) -> bool {
     let output = Command::new("git")
         .args(["rev-parse", "--verify", rev])

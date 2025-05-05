@@ -4,7 +4,7 @@ use crate::app_state::{AppState, NotifChannel};
 use crate::config::{Config, MappingScope};
 
 use crate::errors::Error;
-use crate::git::{get_previous_filename, git_blame_output, CommitRef};
+use crate::git::{get_previous_filename, git_blame_output, CommitInBlame};
 use crate::ui::{date_to_color, highlight_style};
 
 use ratatui::layout::Rect;
@@ -38,7 +38,7 @@ struct BlameAppViewModel {
 pub struct BlameApp {
     state: AppState,
     file: String,
-    blames: Vec<Option<CommitRef>>,
+    blames: Vec<Option<CommitInBlame>>,
     code: Vec<String>,
     revisions: Vec<Option<String>>,
     files: Vec<String>,
@@ -127,7 +127,7 @@ impl<'a> BlameApp {
     }
 
     fn displayed_blame_line(
-        opt_commit: &Option<CommitRef>,
+        opt_commit: &Option<CommitInBlame>,
         idx: usize,
         max_author_len: usize,
         max_line_len: usize,
@@ -161,7 +161,7 @@ impl<'a> BlameApp {
         file: String,
         revision: Option<String>,
         config: &Config,
-    ) -> Result<(Vec<Option<CommitRef>>, Vec<String>), Error> {
+    ) -> Result<(Vec<Option<CommitInBlame>>, Vec<String>), Error> {
         let output = git_blame_output(file, revision.clone(), config)?;
 
         let mut blame_column = Vec::new();
@@ -182,13 +182,13 @@ impl<'a> BlameApp {
                     .split_once(" (")
                     .ok_or_else(|| Error::GitParsingError)?;
                 let metadata: Vec<&str> = blame_text.trim().split_whitespace().collect();
-                let author = metadata[..metadata.len() - 4].join(" ");
-                let date = metadata[metadata.len() - 4];
-                Some(CommitRef::new(
-                    hash.to_string(),
-                    author.to_string(),
-                    date.to_string(),
-                ))
+                let author = metadata[..metadata.len() - 4].join(" ").to_string();
+                let date = metadata[metadata.len() - 4].to_string();
+                Some(CommitInBlame {
+                    hash: hash.to_string(),
+                    author,
+                    date,
+                })
             });
         }
 
@@ -314,17 +314,17 @@ impl GitApp for BlameApp {
         if let Ok(file) = self.get_current_file() {
             self.notif(
                 NotifChannel::Line,
-                format!(
+                Some(format!(
                     "{} - line {} of {}",
                     file,
                     self.idx().unwrap_or(0) + 1,
                     self.blames.len(),
-                ),
+                )),
             );
         }
     }
 
-    fn get_mapping_fields(&mut self) -> Vec<MappingScope> {
+    fn get_mapping_fields(&self) -> Vec<MappingScope> {
         vec![MappingScope::Blame]
     }
 
@@ -379,7 +379,7 @@ impl GitApp for BlameApp {
                 self.reload()?;
             }
             _ => {
-                self.run_generic_action(action, self.view_model.rect.height as usize, terminal)?;
+                self.run_action_generic(action, self.view_model.rect.height as usize, terminal)?;
                 return Ok(());
             }
         };
@@ -396,6 +396,6 @@ impl GitApp for BlameApp {
     }
 
     fn on_scroll(&mut self, down: bool) {
-        self.standard_on_scroll(down, self.view_model.rect.height as usize, self.code.len());
+        self.on_scroll_generic(down, self.view_model.rect.height as usize, self.code.len());
     }
 }
