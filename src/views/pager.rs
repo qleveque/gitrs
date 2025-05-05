@@ -6,22 +6,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{env, io, thread};
 
-use crate::action::Action;
-use crate::app::GitApp;
-use crate::app_state::{AppState, NotifChannel};
+use ratatui::{backend::CrosstermBackend, layout::Rect, widgets::Clear, Frame, Terminal};
 
-use crate::config::MappingScope;
-use crate::errors::Error;
-use crate::git::{git_pager_output, is_valid_git_rev, set_git_dir};
-use crate::pager_widget::PagerWidget;
-use crate::ui::clean_buggy_characters;
-
-use ratatui::layout::Rect;
-
-use ratatui::widgets::Clear;
-use ratatui::Frame;
-use ratatui::{backend::CrosstermBackend, Terminal};
 use regex::Regex;
+
+use crate::app::{FileRevLine, GitApp};
+use crate::model::{
+    action::Action,
+    app_state::{AppState, NotifChannel},
+    config::MappingScope,
+    errors::Error,
+    git::{git_pager_output, is_valid_git_rev, set_git_dir},
+};
+use crate::ui::{pager_widget::PagerWidget, utils::clean_buggy_characters};
 
 struct PagerAppViewModel {
     list: PagerWidget,
@@ -90,7 +87,7 @@ fn remove_graph_symbols(line: &mut String) {
     }
 }
 
-fn guess_log_style(line: &mut String) -> LogStyle {
+fn guess_log_style(line: &mut str) -> LogStyle {
     let mut words = line.split(' ');
     match words.next() {
         Some("commit") => LogStyle::Standard,
@@ -102,12 +99,10 @@ fn guess_log_style(line: &mut String) -> LogStyle {
                 LogStyle::StashPager
             } else if line.contains(" 1) ") {
                 LogStyle::Unknown
+            } else if words.next().is_some() && is_valid_git_rev(rev) {
+                LogStyle::OneLine
             } else {
-                if words.next().is_some() && is_valid_git_rev(rev) {
-                    LogStyle::OneLine
-                } else {
-                    LogStyle::Unknown
-                }
+                LogStyle::Unknown
             }
         }
         None => LogStyle::Unknown,
@@ -143,10 +138,10 @@ impl PagerApp {
                 lines.next()
             }
         }
-        .ok_or_else(|| Error::GlobalError("no data provided to the pager".to_string()))??;
+        .ok_or_else(|| Error::Global("no data provided to the pager".to_string()))??;
         first_line_ansi = clean_buggy_characters(&first_line_ansi);
 
-        let first_line = String::from_utf8(strip_ansi_escapes::strip(&first_line_ansi.as_bytes()))?;
+        let first_line = String::from_utf8(strip_ansi_escapes::strip(first_line_ansi.as_bytes()))?;
 
         // Test if there is a graph mode
         let graph = Some("*") == first_line.split(' ').next();
@@ -234,8 +229,8 @@ impl PagerApp {
             .unwrap()
             .get(idx)
             .cloned()
-            .ok_or_else(|| Error::StateIndexError)?;
-        let bytes = strip_ansi_escapes::strip(&s.as_bytes());
+            .ok_or_else(|| Error::StateIndex)?;
+        let bytes = strip_ansi_escapes::strip(s.as_bytes());
         let str = String::from_utf8(bytes)?;
         Ok(str)
     }
@@ -252,7 +247,7 @@ impl PagerApp {
                 return Some(file.to_string());
             }
         }
-        return None;
+        None
     }
 
     fn line_number_in_line(&self, mut line: String) -> Option<usize> {
@@ -270,7 +265,7 @@ impl PagerApp {
                 };
             }
         }
-        return None;
+        None
     }
 
     fn commit_in_line(&self, mut line: String) -> Option<String> {
@@ -322,7 +317,7 @@ impl PagerApp {
                 return None;
             }
         }
-        return None;
+        None
     }
 }
 
@@ -344,10 +339,7 @@ impl GitApp for PagerApp {
     }
 
     fn get_text_line(&self, idx: usize) -> Option<String> {
-        match self.get_stripped_line(idx) {
-            Err(_) => None,
-            Ok(str) => Some(str),
-        }
+        self.get_stripped_line(idx).ok()
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
@@ -379,7 +371,7 @@ impl GitApp for PagerApp {
         self.mapping_scopes.clone()
     }
 
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error> {
         let mut idx = self.idx()?;
         let mut file = None;
         let mut commit = None;
@@ -388,9 +380,7 @@ impl GitApp for PagerApp {
         // Test if current line describes a file
         if self.log_style == LogStyle::Standard {
             let idx = self.idx()?;
-            let mut line = self
-                .get_stripped_line(idx)
-                .map_err(|_| Error::GitParsingError)?;
+            let mut line = self.get_stripped_line(idx).map_err(|_| Error::GitParsing)?;
             if self.graph {
                 remove_graph_symbols(&mut line);
             }
@@ -400,17 +390,14 @@ impl GitApp for PagerApp {
             if Path::new(&line).is_file() {
                 file = Some(line);
             } else if let Some(caps) = stat_re.captures(&line) {
-                file = match caps.name("file") {
-                    None => None,
-                    Some(file) => Some(file.as_str().trim().to_string()),
-                }
+                file = caps
+                    .name("file")
+                    .map(|file| file.as_str().trim().to_string())
             }
         }
 
         loop {
-            let line = self
-                .get_stripped_line(idx)
-                .map_err(|_| Error::GitParsingError)?;
+            let line = self.get_stripped_line(idx).map_err(|_| Error::GitParsing)?;
             if file.is_none() {
                 if let Some(line_file) = self.file_in_line(line.clone()) {
                     file = Some(line_file);
@@ -449,7 +436,7 @@ impl GitApp for PagerApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.commit_in_line(line) {
+                    if self.commit_in_line(line).is_some() {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
@@ -467,7 +454,7 @@ impl GitApp for PagerApp {
                     let line = self
                         .get_stripped_line(idx)
                         .map_err(|_| Error::ReachedLastMachted)?;
-                    if let Some(_) = self.commit_in_line(line) {
+                    if self.commit_in_line(line).is_some() {
                         self.state.list_state.select(Some(idx));
                         break;
                     }
@@ -478,13 +465,12 @@ impl GitApp for PagerApp {
                 self.run_action_generic(action, self.view_model.rect.height as usize, terminal)?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn on_exit(&mut self) -> Result<(), Error> {
-        env::set_current_dir(self.original_dir.clone()).map_err(|_| {
-            Error::GlobalError("could not restore initial working directory".to_string())
-        })
+        env::set_current_dir(self.original_dir.clone())
+            .map_err(|_| Error::Global("could not restore initial working directory".to_string()))
     }
 
     fn on_scroll(&mut self, down: bool) {

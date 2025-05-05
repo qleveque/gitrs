@@ -1,19 +1,22 @@
-use crate::action::Action;
-use crate::app::GitApp;
-use crate::app_state::AppState;
+use crate::app::{FileRevLine, GitApp};
 
-use crate::config::MappingScope;
-use crate::errors::Error;
-use crate::git::{git_stash_output, Stash};
-use crate::ui::{date_to_color, highlight_style};
+use crate::model::{
+    action::Action,
+    app_state::AppState,
+    config::MappingScope,
+    errors::Error,
+    git::{git_stash_output, Stash},
+};
+use crate::ui::utils::{date_to_color, highlight_style};
 
-use ratatui::layout::Rect;
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, StatefulWidget};
-
-use ratatui::Frame;
-use ratatui::{backend::CrosstermBackend, style::Color, widgets::List, Terminal};
+use ratatui::{
+    backend::CrosstermBackend,
+    layout::Rect,
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::{List, Paragraph, StatefulWidget},
+    Frame, Terminal,
+};
 
 struct StashAppViewModel {
     stash_list: List<'static>,
@@ -41,7 +44,7 @@ impl StashApp {
         };
         r.reload()?;
         r.state.list_state.select_first();
-        return Ok(r);
+        Ok(r)
     }
 }
 
@@ -59,12 +62,8 @@ impl GitApp for StashApp {
         self.stashes = output
             .lines()
             .map(|line| {
-                let (full_date, title) = line
-                    .split_once('\t')
-                    .ok_or_else(|| Error::GitParsingError)?;
-                let (date, _) = full_date
-                    .split_once(' ')
-                    .ok_or_else(|| Error::GitParsingError)?;
+                let (full_date, title) = line.split_once('\t').ok_or_else(|| Error::GitParsing)?;
+                let (date, _) = full_date.split_once(' ').ok_or_else(|| Error::GitParsing)?;
                 let stash = Stash {
                     title: title.to_string(),
                     date: date.to_string(),
@@ -93,10 +92,9 @@ impl GitApp for StashApp {
     }
 
     fn get_text_line(&self, idx: usize) -> Option<String> {
-        match self.stashes.get(idx) {
-            Some(stash) => Some(format!("{} {}", stash.date, stash.title)),
-            None => None,
-        }
+        self.stashes
+            .get(idx)
+            .map(|stash| format!("{} {}", stash.date, stash.title))
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
@@ -121,7 +119,7 @@ impl GitApp for StashApp {
         vec![MappingScope::Stash]
     }
 
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error> {
         Ok((None, Some(format!("stash@{{{}}}", self.idx()?)), None))
     }
 
@@ -131,7 +129,7 @@ impl GitApp for StashApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         self.run_action_generic(action, self.view_model.height, terminal)?;
-        return Ok(());
+        Ok(())
     }
 
     fn on_click(&mut self) {

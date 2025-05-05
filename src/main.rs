@@ -1,38 +1,29 @@
-mod action;
 mod app;
-mod app_state;
-mod blame_app;
-mod config;
-mod errors;
-mod git;
-mod pager_app;
-mod pager_widget;
-mod show_app;
-mod stash_app;
-mod status_app;
+mod model;
 mod ui;
-
-use std::io::{self, stdout};
+mod views;
 
 use atty::Stream;
-use blame_app::BlameApp;
 use clap::{Parser, Subcommand};
-
-use errors::Error;
-use pager_app::{PagerApp, PagerCommand};
-use show_app::ShowApp;
-use stash_app::StashApp;
-use status_app::StatusApp;
-
-use app::GitApp;
-
-use ratatui::{backend::CrosstermBackend, Terminal};
-
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     style::Stylize,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io::{self, stdout};
+
+use crate::{
+    app::GitApp,
+    model::errors::Error,
+    views::{
+        blame::BlameApp,
+        pager::{PagerApp, PagerCommand},
+        show::ShowApp,
+        stash::StashApp,
+        status::StatusApp,
+    },
 };
 
 #[derive(Parser)]
@@ -79,15 +70,14 @@ enum Commands {
 }
 
 fn app(terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>, cli: Cli) -> Result<(), Error> {
-    let ret = match cli.command {
+    match cli.command {
         Commands::Status => StatusApp::new()?.run(terminal),
         Commands::Blame { file, line } => BlameApp::new(file, None, line)?.run(terminal),
         Commands::Show { revision } => ShowApp::new(revision)?.run(terminal),
         Commands::Log { args } => PagerApp::new(Some(PagerCommand::Log(args)))?.run(terminal),
         Commands::Diff { args } => PagerApp::new(Some(PagerCommand::Diff(args)))?.run(terminal),
         Commands::Stash => StashApp::new()?.run(terminal),
-    };
-    ret
+    }
 }
 
 fn prepare_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>, io::Error> {

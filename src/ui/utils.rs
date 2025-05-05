@@ -1,8 +1,5 @@
+use crate::model::{action::Action, app_state::NotifChannel, config::Button};
 use chrono::{NaiveDate, Utc};
-use std::collections::HashMap;
-
-
-use crate::{action::Action, app_state::NotifChannel, config::Button};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
@@ -10,6 +7,7 @@ use ratatui::{
     widgets::{Clear, Paragraph, Widget},
     Frame,
 };
+use std::collections::HashMap;
 
 pub const SPINNER_FRAMES: &[char] = &['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
 
@@ -50,7 +48,7 @@ pub fn clicked_button_style() -> Style {
 
 pub fn date_to_color(date: &str) -> Color {
     let today = Utc::now().date_naive();
-    let past_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d").unwrap_or(today.clone());
+    let past_date = NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap_or(today);
     let age_factor = (today - past_date).num_days() as f32 / (365.0 * 2.0);
 
     let clamped = age_factor.clamp(0.0, 1.0);
@@ -60,7 +58,7 @@ pub fn date_to_color(date: &str) -> Color {
     Color::Rgb(r, g, b)
 }
 
-pub fn clean_buggy_characters(line: &String) -> String {
+pub fn clean_buggy_characters(line: &str) -> String {
     line.replace("\t", "    ").replace("\r", "^M")
 }
 
@@ -148,9 +146,8 @@ pub fn display_menu_bar(
     mouse_position: Position,
     mouse_down: bool,
     chunk: &mut Rect,
-    frame: &mut Frame
+    frame: &mut Frame,
 ) -> Vec<(Rect, Action)> {
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(0)])

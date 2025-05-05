@@ -1,28 +1,26 @@
-use crate::action::Action;
-use crate::app::GitApp;
-use crate::app_state::{AppState, NotifChannel};
-use crate::config::{Config, MappingScope};
+use crate::app::{FileRevLine, GitApp};
+use crate::model::{
+    action::Action,
+    app_state::{AppState, NotifChannel},
+    config::{Config, MappingScope},
+    errors::Error,
+    git::{get_previous_filename, git_blame_output, CommitInBlame},
+};
+use crate::ui::utils::{date_to_color, highlight_style};
 
-use crate::errors::Error;
-use crate::git::{get_previous_filename, git_blame_output, CommitInBlame};
-use crate::ui::{date_to_color, highlight_style};
-
-use ratatui::layout::Rect;
-use ratatui::style::Style;
-use ratatui::text::{Line, Span};
-use ratatui::widgets::StatefulWidget;
-
-use ratatui::Frame;
-use syntect::easy::HighlightLines;
-use syntect::highlighting::{Style as SyntectStyle, ThemeSet};
-use syntect::parsing::SyntaxSet;
+use syntect::{
+    easy::HighlightLines,
+    highlighting::{Style as SyntectStyle, ThemeSet},
+    parsing::SyntaxSet,
+};
 
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::Color,
-    widgets::{Block, Borders, List, ListItem},
-    Terminal,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, StatefulWidget},
+    Frame, Terminal,
 };
 use syntect::util::LinesWithEndings;
 
@@ -48,7 +46,7 @@ pub struct BlameApp {
 impl<'a> BlameApp {
     pub fn new(file: String, revision: Option<String>, line: usize) -> Result<Self, Error> {
         if !Path::new(&file).exists() {
-            return Err(Error::GlobalError(
+            return Err(Error::Global(
                 format!("file '{}' does not exist", file).to_string(),
             ));
         }
@@ -79,7 +77,7 @@ impl<'a> BlameApp {
         Ok(self
             .files
             .last()
-            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?
+            .ok_or_else(|| Error::Global("blame app revision stack empty".to_string()))?
             .to_string())
     }
 
@@ -104,7 +102,7 @@ impl<'a> BlameApp {
 
         for line in LinesWithEndings::from(&file_text) {
             let ranges: Vec<(SyntectStyle, String)> = h
-                .highlight_line(&line, &ps)?
+                .highlight_line(line, &ps)?
                 .into_iter()
                 .map(|(style, text)| (style, text.to_string())) // Convert &str to owned String
                 .collect();
@@ -168,20 +166,20 @@ impl<'a> BlameApp {
         let mut code_column = Vec::new();
 
         for line in output.lines() {
-            let (blame, code) = line.split_once(')').ok_or_else(|| Error::GitParsingError)?;
+            let (blame, code) = line.split_once(')').ok_or_else(|| Error::GitParsing)?;
             code_column.push(code.to_string());
             let blame_text = blame.to_string() + ")";
             let (hash, _) = blame_text
                 .split_once(" ")
-                .ok_or_else(|| Error::GitParsingError)?;
+                .ok_or_else(|| Error::GitParsing)?;
             // for initial commit
             blame_column.push(if hash.starts_with("0000") {
                 None
             } else {
                 let (_, blame_text) = blame_text
                     .split_once(" (")
-                    .ok_or_else(|| Error::GitParsingError)?;
-                let metadata: Vec<&str> = blame_text.trim().split_whitespace().collect();
+                    .ok_or_else(|| Error::GitParsing)?;
+                let metadata: Vec<&str> = blame_text.split_whitespace().collect();
                 let author = metadata[..metadata.len() - 4].join(" ").to_string();
                 let date = metadata[metadata.len() - 4].to_string();
                 Some(CommitInBlame {
@@ -213,12 +211,12 @@ impl GitApp for BlameApp {
         let revision = self
             .revisions
             .last()
-            .ok_or_else(|| Error::GlobalError("blame app revision stack empty".to_string()))?;
+            .ok_or_else(|| Error::Global("blame app revision stack empty".to_string()))?;
         let file = self.get_current_file()?;
 
         let (new_blames, new_code) =
             BlameApp::parse_git_blame(file.clone(), revision.clone(), &self.state.config)?;
-        if new_blames.len() == 0 {
+        if new_blames.is_empty() {
             self.revisions.pop();
             self.files.pop();
             return Ok(());
@@ -328,9 +326,9 @@ impl GitApp for BlameApp {
         vec![MappingScope::Blame]
     }
 
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error> {
         let idx = self.idx()?;
-        let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
+        let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndex)?;
 
         let rev = match commit_ref {
             Some(commit) => {
@@ -362,7 +360,7 @@ impl GitApp for BlameApp {
             }
             Action::PreviousCommitBlame => {
                 let idx = self.idx()?;
-                let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndexError)?;
+                let commit_ref = self.blames.get(idx).ok_or_else(|| Error::StateIndex)?;
                 let file = self.get_current_file()?;
                 let (rev, prev_file) = if let Some(commit) = commit_ref {
                     if let Some('^') = commit.hash.chars().next() {
@@ -383,7 +381,7 @@ impl GitApp for BlameApp {
                 return Ok(());
             }
         };
-        return Ok(());
+        Ok(())
     }
 
     fn on_click(&mut self) {

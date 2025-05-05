@@ -1,25 +1,18 @@
-use crate::action::Action;
-use crate::app::GitApp;
-use crate::app_state::AppState;
-use crate::config::{Config, MappingScope};
-use crate::errors::Error;
-use crate::git::FileStatus;
-
-use std::collections::HashMap;
-
-use crate::git::{git_add_restore, git_status_output, GitFile, StagedStatus};
-
-use ratatui::layout::Rect;
-use ratatui::prelude::CrosstermBackend;
-use ratatui::style::Style;
-use ratatui::widgets::{ListState, Paragraph, StatefulWidget};
+use crate::app::{FileRevLine, GitApp};
+use crate::model::action::Action;
+use crate::model::app_state::AppState;
+use crate::model::config::{Config, MappingScope};
+use crate::model::errors::Error;
+use crate::model::git::{git_add_restore, git_status_output, FileStatus, GitFile, StagedStatus};
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    style::Color,
-    widgets::{Block, Borders, List, ListItem},
+    layout::{Constraint, Direction, Layout, Rect},
+    prelude::CrosstermBackend,
+    style::{Color, Style},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, StatefulWidget},
 };
 use ratatui::{Frame, Terminal};
+use std::collections::HashMap;
 
 fn compute_tables(
     files: &HashMap<String, GitFile>,
@@ -68,8 +61,8 @@ fn parse_git_status(files: &mut HashMap<String, GitFile>, config: &Config) -> Re
     let git_status = git_status_output(config);
     for line in git_status?.lines() {
         let filename: String = line[2..].trim().to_string();
-        let second: char = line.chars().nth(1).ok_or_else(|| Error::GitParsingError)?;
-        let first: char = line.chars().nth(0).ok_or_else(|| Error::GitParsingError)?;
+        let second: char = line.chars().nth(1).ok_or_else(|| Error::GitParsing)?;
+        let first: char = line.chars().next().ok_or_else(|| Error::GitParsing)?;
 
         let unstaged_status = match second {
             '?' => FileStatus::New,
@@ -92,7 +85,7 @@ fn parse_git_status(files: &mut HashMap<String, GitFile>, config: &Config) -> Re
 }
 
 fn list_to_draw<'a>(
-    table: &'a Vec<(FileStatus, String)>,
+    table: &'a [(FileStatus, String)],
     color: Color,
     title: String,
     config: &'a Config,
@@ -101,15 +94,13 @@ fn list_to_draw<'a>(
 
     let r: Vec<ListItem> = table
         .iter()
-        .map(|item| {
-            ListItem::new(format!("{} {}", item.0.character(), item.1)).style(style)
-        })
+        .map(|item| ListItem::new(format!("{} {}", item.0.character(), item.1)).style(style))
         .collect();
-    return List::new(r)
+    List::new(r)
         .block(Block::default().title(title).borders(Borders::TOP))
         .style(Style::from(Color::White))
         .highlight_style(Style::from(Color::Black).bg(color))
-        .scroll_padding(config.scrolloff);
+        .scroll_padding(config.scrolloff)
 }
 
 #[derive(Default)]
@@ -154,7 +145,7 @@ impl StatusApp {
         let idx = self.idx()?;
         let filename = match self.get_current_table().get(idx) {
             Some((_, filename)) => filename,
-            None => return Err(Error::StateIndexError),
+            None => return Err(Error::StateIndex),
         };
         Ok(filename.to_string())
     }
@@ -162,13 +153,13 @@ impl StatusApp {
     fn get_git_file(&self) -> Result<GitFile, Error> {
         let git_file = match self.git_files.get(&self.get_filename()?) {
             Some(git_file) => git_file.clone(),
-            None => return Err(Error::StateIndexError),
+            None => return Err(Error::StateIndex),
         };
         Ok(git_file)
     }
 
     fn tables_are_empty(&self) -> bool {
-        return self.unstaged_table.len() == 0 && self.staged_table.len() == 0;
+        self.unstaged_table.is_empty() && self.staged_table.is_empty()
     }
 }
 
@@ -205,10 +196,9 @@ impl GitApp for StatusApp {
     }
 
     fn get_text_line(&self, idx: usize) -> Option<String> {
-        match self.get_current_table().get(idx) {
-            Some((_, name)) => Some(name.to_string()),
-            None => None,
-        }
+        self.get_current_table()
+            .get(idx)
+            .map(|(_, name)| name.to_string())
     }
 
     fn reload(&mut self) -> Result<(), Error> {
@@ -219,7 +209,7 @@ impl GitApp for StatusApp {
             &mut self.unstaged_table,
             &mut self.staged_table,
         );
-        if !self.tables_are_empty() && 0 == self.get_current_table().len() {
+        if !self.tables_are_empty() && self.get_current_table().is_empty() {
             switch_staged_status(&mut self.staged_status, &mut self.state.list_state);
         }
         Ok(())
@@ -309,11 +299,8 @@ impl GitApp for StatusApp {
         ]
     }
 
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
-        let filename = match self.get_filename() {
-            Ok(filename) => Some(filename),
-            Err(_) => None,
-        };
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error> {
+        let filename = self.get_filename().ok();
         Ok((filename, Some("HEAD".to_string()), None))
     }
 
@@ -342,8 +329,8 @@ impl GitApp for StatusApp {
     ) -> Result<(), Error> {
         match action {
             Action::StageUnstageFile => {
-                let mut git_file = self.git_files.get_mut(&self.get_filename()?).unwrap();
-                toggle_stage_git_file(&mut git_file, self.staged_status);
+                let git_file = self.git_files.get_mut(&self.get_filename()?).unwrap();
+                toggle_stage_git_file(git_file, self.staged_status);
                 compute_tables(
                     &self.git_files,
                     &mut self.unstaged_table,
@@ -357,11 +344,11 @@ impl GitApp for StatusApp {
                     .map(|(_, filename)| filename.clone())
                     .collect();
                 for filename in filenames {
-                    let mut git_file = match self.git_files.get_mut(&filename) {
+                    let git_file = match self.git_files.get_mut(&filename) {
                         Some(git_file) => git_file,
                         None => return Err(Error::UnknownFilename(filename)),
                     };
-                    toggle_stage_git_file(&mut git_file, self.staged_status);
+                    toggle_stage_git_file(git_file, self.staged_status);
                 }
                 compute_tables(
                     &self.git_files,
@@ -397,9 +384,9 @@ impl GitApp for StatusApp {
                 self.run_action_generic(action, rect.height as usize, terminal)?;
             }
         }
-        if !self.tables_are_empty() && 0 == self.get_current_table().len() {
+        if !self.tables_are_empty() && self.get_current_table().is_empty() {
             switch_staged_status(&mut self.staged_status, &mut self.state.list_state);
         }
-        return Ok(());
+        Ok(())
     }
 }

@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{config::Config, errors::Error};
+use crate::model::{config::Config, errors::Error};
 
 #[derive(Debug, Clone, Copy, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
@@ -40,7 +40,7 @@ impl FromStr for FileStatus {
             "new" => Ok(FileStatus::New),
             "deleted" => Ok(FileStatus::Deleted),
             "conflicted" => Ok(FileStatus::Unmerged),
-            _ => Err(Error::ParseMappingScopeError(s.to_string())),
+            _ => Err(Error::ParseMappingScope(s.to_string())),
         }
     }
 }
@@ -59,7 +59,7 @@ impl FromStr for StagedStatus {
         match s {
             "unstaged" => Ok(StagedStatus::Unstaged),
             "staged" => Ok(StagedStatus::Staged),
-            _ => Err(Error::ParseMappingScopeError(s.to_string())),
+            _ => Err(Error::ParseMappingScope(s.to_string())),
         }
     }
 }
@@ -127,7 +127,7 @@ impl GitFile {
                 _ => return Some(GitOp::Restore),
             }
         }
-        return None;
+        None
     }
 
     fn reinit(&mut self) {
@@ -146,13 +146,13 @@ pub fn git_status_output(config: &Config) -> Result<String, Error> {
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let reader = BufReader::new(stdout);
 
-    let lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
+    let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
     let output_text = lines.join("\n");
 
     let status = child.wait().expect("Failed to wait on child");
 
     if !status.success() {
-        return Err(Error::GitCommandError);
+        return Err(Error::GitCommand);
     }
     Ok(output_text)
 }
@@ -171,10 +171,10 @@ pub fn git_blame_output(
     let output = Command::new(config.git_exe.clone())
         .args(args)
         .output()
-        .map_err(|_| Error::GitCommandError)?;
+        .map_err(|_| Error::GitCommand)?;
 
     if !output.status.success() {
-        return Err(Error::GitCommandError);
+        return Err(Error::GitCommand);
     }
 
     Ok(String::from_utf8_lossy(&output.stdout)
@@ -182,21 +182,21 @@ pub fn git_blame_output(
         .replace('\t', "    "))
 }
 
-pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
+pub fn git_parse_commit(output: &str) -> Result<Commit, Error> {
     let mut lines = output.lines().map(String::from);
     let mut metadata: Vec<String> = Vec::new();
 
     // Parse commit hash
-    let line = lines.next().ok_or_else(|| Error::GitParsingError)?;
+    let line = lines.next().ok_or_else(|| Error::GitParsing)?;
     let commit_hash = line
         .split_whitespace()
         .nth(1)
-        .ok_or_else(|| Error::GitParsingError)?;
+        .ok_or_else(|| Error::GitParsing)?;
     metadata.push(line.clone());
 
     // Read all metadata
-    while let Some(line) = lines.next() {
-        if line.len() == 0 {
+    for line in lines.by_ref() {
+        if line.is_empty() {
             metadata.push("".to_string());
             break;
         }
@@ -207,7 +207,7 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
     let mut parsing_files = false;
     let mut files: Vec<(FileStatus, String)> = Vec::new();
 
-    while let Some(line) = lines.next() {
+    for line in lines {
         if !parsing_files {
             if !line.chars().next().unwrap_or(' ').is_whitespace() {
                 parsing_files = true;
@@ -225,7 +225,7 @@ pub fn git_parse_commit(output: &String) -> Result<Commit, Error> {
             let filename = line
                 .split('\t')
                 .nth(1)
-                .ok_or_else(|| Error::GitParsingError)?
+                .ok_or_else(|| Error::GitParsing)?
                 .to_string();
             files.push((status, filename));
         }
@@ -249,10 +249,10 @@ pub fn git_stash_output(config: &Config) -> Result<String, Error> {
     let output = Command::new(config.git_exe.clone())
         .args(args)
         .output()
-        .map_err(|_| Error::GitCommandError)?;
+        .map_err(|_| Error::GitCommand)?;
 
     if !output.status.success() {
-        return Err(Error::GitCommandError);
+        return Err(Error::GitCommand);
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -273,10 +273,10 @@ pub fn git_show_output(revision: &Option<String>, config: &Config) -> Result<Str
     let output = Command::new(config.git_exe.clone())
         .args(args)
         .output()
-        .map_err(|_| Error::GitCommandError)?;
+        .map_err(|_| Error::GitCommand)?;
 
     if !output.status.success() {
-        return Err(Error::GitCommandError);
+        return Err(Error::GitCommand);
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -295,7 +295,7 @@ pub fn git_pager_output(
         .stdout(Stdio::piped())
         .spawn()?;
 
-    let stdout = command.stdout.ok_or_else(|| Error::GitParsingError)?;
+    let stdout = command.stdout.ok_or_else(|| Error::GitParsing)?;
 
     Ok(BufReader::new(stdout))
 }
@@ -322,7 +322,7 @@ pub fn set_git_dir(config: &Config) -> Result<(), Error> {
         .expect("Failed to execute git command");
 
     if !output.status.success() {
-        return Err(Error::NotInGitRepoError);
+        return Err(Error::NotInGitRepo);
     }
     let mut repo_root = String::from_utf8_lossy(&output.stdout);
     repo_root = adapt_repo_root(repo_root.to_string().clone()).into();
@@ -338,7 +338,7 @@ pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
                 files_to_op.push(filename.clone());
             }
         }
-        if files_to_op.len() == 0 {
+        if files_to_op.is_empty() {
             continue;
         }
         let args = match *op {
@@ -357,7 +357,7 @@ pub fn git_add_restore(files: &mut HashMap<String, GitFile>, config: &Config) {
             .expect("Failed to wait on git command");
     }
 
-    for (_, git_file) in files {
+    for git_file in files.values_mut() {
         git_file.reinit();
     }
 }
@@ -368,7 +368,7 @@ pub fn get_previous_filename(rev: &str, current_filename: &str) -> Result<String
         .output()?;
 
     if !output.status.success() {
-        return Err(Error::GitCommandError);
+        return Err(Error::GitCommand);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);

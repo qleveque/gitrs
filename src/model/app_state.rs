@@ -5,7 +5,7 @@ use ratatui::{
     widgets::ListState,
 };
 
-use crate::{
+use crate::model::{
     action::Action,
     config::{parse_gitrs_config, Config},
     errors::Error,
@@ -60,6 +60,6 @@ impl AppState {
             mouse_position: Position::default(),
             mouse_down: false,
         };
-        return Ok(r);
+        Ok(r)
     }
 }

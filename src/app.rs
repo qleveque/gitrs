@@ -5,15 +5,6 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{
-    app_state::NotifChannel,
-    config::{Button, MappingScope},
-    pager_app::{PagerApp, PagerCommand},
-    ui::{
-        display_cmd_line, display_menu_bar, display_notifications, display_search_bar, search_highlight_style, SPINNER_FRAMES
-    },
-};
-
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
@@ -31,11 +22,23 @@ use ratatui::{
 use regex::{Regex, RegexBuilder};
 
 use crate::{
-    action::{Action, CommandType},
-    app_state::{AppState, InputState},
-    errors::Error,
-    show_app::ShowApp,
+    model::{
+        action::{Action, CommandType},
+        app_state::{AppState, InputState, NotifChannel},
+        config::{Button, MappingScope},
+        errors::Error,
+    },
+    ui::utils::{
+        display_cmd_line, display_menu_bar, display_notifications, display_search_bar,
+        search_highlight_style, SPINNER_FRAMES,
+    },
+    views::{
+        pager::{PagerApp, PagerCommand},
+        show::ShowApp,
+    },
 };
+
+pub type FileRevLine = (Option<String>, Option<String>, Option<usize>);
 
 pub trait GitApp {
     fn draw(&mut self, frame: &mut Frame, rect: Rect);
@@ -56,10 +59,10 @@ pub trait GitApp {
         self.get_state()
             .list_state
             .selected()
-            .ok_or_else(|| Error::StateIndexError)
+            .ok_or_else(|| Error::StateIndex)
     }
     fn get_mapping_fields(&self) -> Vec<MappingScope>;
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error>;
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error>;
 
     fn run_action(
         &mut self,
@@ -83,7 +86,7 @@ pub trait GitApp {
         let regex = RegexBuilder::new(&search_string)
             .case_insensitive(!is_case_sensitive)
             .build()
-            .map_err(|_| Error::GlobalError("invalid regex".to_string()))?;
+            .map_err(|_| Error::Global("invalid regex".to_string()))?;
         Ok(regex)
     }
 
@@ -110,7 +113,7 @@ pub trait GitApp {
             };
 
             if regex.is_match(&line) {
-                self.state().list_state.select(Some(idx as usize));
+                self.state().list_state.select(Some(idx));
                 // stop search
                 self.state().current_search_idx = None;
                 self.notif(NotifChannel::Search, None);
@@ -138,7 +141,7 @@ pub trait GitApp {
             let line = match self.get_text_line(idx) {
                 None => {
                     if !self.loaded() {
-                        assert_eq!(reversed, false);
+                        assert!(!reversed);
                         // if not fully loaded yet, we need to continue the search
                         let message =
                             format!("searching for `{}`...", self.get_state().search_string);
@@ -153,12 +156,11 @@ pub trait GitApp {
             };
 
             if regex.is_match(&line) {
-                self.state().list_state.select(Some(idx as usize));
+                self.state().list_state.select(Some(idx));
                 return Ok(());
             }
         }
     }
-
 
     fn buttons(&self) -> Vec<Button> {
         let config = &self.get_state().config;
@@ -222,14 +224,14 @@ pub trait GitApp {
     ) -> Result<(), Error> {
         let mut notif_time = 0;
         loop {
-            terminal.draw(|mut frame| {
+            terminal.draw(|frame| {
                 let mut chunk = frame.area();
                 self.state().region_to_action = display_menu_bar(
                     &self.buttons(),
                     self.get_state().mouse_position,
                     self.get_state().mouse_down,
                     &mut chunk,
-                    &mut frame
+                    frame,
                 );
 
                 self.draw(frame, chunk);
@@ -241,11 +243,11 @@ pub trait GitApp {
                         &state.search_string,
                         state.search_reverse,
                         &mut chunk,
-                        &mut frame,
+                        frame,
                     );
                 }
                 if state.input_state == InputState::Command {
-                    display_cmd_line(&state.command_string, &mut chunk, &mut frame);
+                    display_cmd_line(&state.command_string, &mut chunk, frame);
                 }
 
                 display_notifications(
@@ -253,7 +255,7 @@ pub trait GitApp {
                     SPINNER_FRAMES[notif_time],
                     self.loaded(),
                     &mut chunk,
-                    &mut frame,
+                    frame,
                 );
                 notif_time = (notif_time + 1) % SPINNER_FRAMES.len();
             })?;
@@ -274,9 +276,8 @@ pub trait GitApp {
             if let Some(action) = opt_action {
                 // stop search in case there is a new action
                 self.state().current_search_idx = None;
-                match self.run_action(&action, terminal) {
-                    Err(err) => self.notif(NotifChannel::Error, Some(err.to_string())),
-                    Ok(()) => (),
+                if let Err(err) = self.run_action(&action, terminal) {
+                    self.notif(NotifChannel::Error, Some(err.to_string()))
                 }
                 if self.state().quit {
                     break;
@@ -341,14 +342,7 @@ pub trait GitApp {
             }
             Action::Command(command_type, command) => {
                 let (file, rev, line) = self.get_file_rev_line()?;
-                self.run_command(
-                    terminal,
-                    &command_type,
-                    command.to_string(),
-                    file,
-                    rev,
-                    line,
-                )?;
+                self.run_command(terminal, command_type, command.to_string(), file, rev, line)?;
             }
             Action::Search => {
                 self.state().search_string = "".to_string();
@@ -389,7 +383,7 @@ pub trait GitApp {
                 };
             }
             action => {
-                return Err(Error::GlobalError(format!(
+                return Err(Error::Global(format!(
                     "cannot run `{:?}` in this context",
                     action
                 )));
@@ -418,7 +412,7 @@ pub trait GitApp {
                         Position::new(mouse_event.column, mouse_event.row);
                     match mouse_event.kind {
                         MouseEventKind::Down(mouse_button) => {
-                            return Ok(self.handle_click_event(mouse_button)?)
+                            return self.handle_click_event(mouse_button)
                         }
                         MouseEventKind::Up(_) => self.state().mouse_down = false,
                         MouseEventKind::ScrollUp => self.on_scroll(false),
@@ -429,7 +423,7 @@ pub trait GitApp {
                 _ => (),
             }
         }
-        return Ok(None);
+        Ok(None)
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
@@ -458,7 +452,7 @@ pub trait GitApp {
 
         // Compute command to run from config
         let keys = self.state().key_combination.clone();
-        if keys == "" {
+        if keys.is_empty() {
             return Ok(None);
         }
 
@@ -511,11 +505,11 @@ pub trait GitApp {
                     }
                     InputState::App => (),
                 }
-            },
+            }
             KeyCode::Esc => self.cancel_input(),
             KeyCode::Backspace => {
                 line.pop();
-            },
+            }
             KeyCode::Char(c) => line.push(c),
             _ => {
                 let message = "error: this char is not handled yet".to_string();

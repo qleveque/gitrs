@@ -3,14 +3,13 @@ use std::cmp::min;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    text::Text,
     widgets::{Block, Borders, List, ListItem, ListState, StatefulWidget},
 };
 
-use crate::{app_state::AppState, ui::highlight_style};
+use crate::{model::app_state::AppState, ui::utils::highlight_style};
 use ansi_to_tui::IntoText as _;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PagerWidget {
     inner: List<'static>,
     state: ListState,
@@ -38,7 +37,7 @@ pub fn adapt_index_in_frame(
 
 impl PagerWidget {
     pub fn new(
-        items: &Vec<String>,
+        items: &[String],
         height: usize,
         app_state: &mut AppState,
         scroll: Option<bool>,
@@ -51,7 +50,7 @@ impl PagerWidget {
         if index >= items.len() {
             index = items.len() - 1;
         }
-        if items.len() == 0 {
+        if items.is_empty() {
             return Self::default();
         }
         let mut offset = app_state.list_state.offset();
@@ -71,18 +70,14 @@ impl PagerWidget {
                 }
                 // reduce offset
                 if offset + scrolloff >= index {
-                    offset = if scrolloff <= index {
-                        index - scrolloff
-                    } else {
-                        0
-                    }
+                    offset = index.saturating_sub(scrolloff)
                 }
             }
             Some(down) => {
                 match down {
                     true => {
                         offset += scroll_step;
-                        if items.len() >= scrolloff + 1 && offset >= items.len() - scrolloff - 1 {
+                        if items.len() > scrolloff && offset >= items.len() - scrolloff - 1 {
                             offset = items.len() - scrolloff - 1
                         }
                     }
@@ -90,7 +85,7 @@ impl PagerWidget {
                         if offset < scroll_step {
                             offset = 0;
                         } else {
-                            offset = offset - scroll_step;
+                            offset -= scroll_step;
                         }
                     }
                 };
@@ -109,10 +104,10 @@ impl PagerWidget {
         }
 
         let list_items: Vec<ListItem> = items[first..last]
-            .into_iter()
+            .iter()
             .map(|s| {
-                let text = s.as_bytes().into_text().unwrap_or(Text::default());
-                return ListItem::new(text);
+                let text = s.as_bytes().into_text().unwrap_or_default();
+                ListItem::new(text)
             })
             .collect();
         let inner = List::new(list_items)
@@ -123,14 +118,5 @@ impl PagerWidget {
 
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         StatefulWidget::render(&self.inner, area, buf, &mut self.state);
-    }
-}
-
-impl Default for PagerWidget {
-    fn default() -> Self {
-        Self {
-            inner: List::default(),
-            state: ListState::default(),
-        }
     }
 }

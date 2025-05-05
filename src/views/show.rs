@@ -1,23 +1,21 @@
-use crate::action::Action;
-use crate::app::GitApp;
-use crate::app_state::AppState;
+use crate::app::{FileRevLine, GitApp};
 
-use crate::config::MappingScope;
-use crate::errors::Error;
-use crate::git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus};
+use crate::model::{
+    action::Action,
+    app_state::AppState,
+    config::MappingScope,
+    errors::Error,
+    git::{git_parse_commit, git_show_output, set_git_dir, Commit, FileStatus},
+};
 
-use ratatui::layout::Rect;
-use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Text};
-use ratatui::widgets::{Paragraph, StatefulWidget, Widget};
-
-use ratatui::Frame;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::Color,
-    widgets::{Block, Borders, List, ListItem},
-    Terminal,
+    style::{Modifier, Style},
+    text::{Line, Text},
+    widgets::{Block, Borders, List, ListItem, Paragraph, StatefulWidget, Widget},
+    Frame, Terminal,
 };
 
 use std::env;
@@ -60,7 +58,7 @@ impl ShowApp {
             },
         };
         r.reload()?;
-        return Ok(r);
+        Ok(r)
     }
 
     fn display_commit_metadata<'b>(metadata: String) -> Paragraph<'b> {
@@ -126,16 +124,12 @@ impl GitApp for ShowApp {
     }
 
     fn get_text_line(&self, idx: usize) -> Option<String> {
-        match self.commit.files.get(idx) {
-            Some(tuple) => Some(tuple.1.clone()),
-            None => None,
-        }
+        self.commit.files.get(idx).map(|tuple| tuple.1.clone())
     }
 
     fn on_exit(&mut self) -> Result<(), Error> {
-        env::set_current_dir(self.original_dir.clone()).map_err(|_| {
-            Error::GlobalError("could not restore initial working directory".to_string())
-        })
+        env::set_current_dir(self.original_dir.clone())
+            .map_err(|_| Error::Global("could not restore initial working directory".to_string()))
     }
 
     fn draw(&mut self, frame: &mut Frame, rect: Rect) {
@@ -178,13 +172,13 @@ impl GitApp for ShowApp {
         vec![MappingScope::Show(file.copied()), MappingScope::Show(None)]
     }
 
-    fn get_file_rev_line(&self) -> Result<(Option<String>, Option<String>, Option<usize>), Error> {
+    fn get_file_rev_line(&self) -> Result<FileRevLine, Error> {
         let idx = self.idx()?;
         let file = self
             .commit
             .files
             .get(idx)
-            .ok_or_else(|| Error::StateIndexError)?;
+            .ok_or_else(|| Error::StateIndex)?;
         let rev = Some(self.commit.hash.clone());
         Ok((Some(file.1.clone()), rev, None))
     }
@@ -195,7 +189,7 @@ impl GitApp for ShowApp {
         terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Error> {
         self.run_action_generic(action, self.view_model.files_rect.height as usize, terminal)?;
-        return Ok(());
+        Ok(())
     }
 
     fn on_click(&mut self) {

@@ -5,31 +5,31 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("unknown action `{0}`")]
-    ParseActionError(String),
+    ParseAction(String),
     #[error("unknown mapping scope `{0}`")]
-    ParseMappingScopeError(String),
+    ParseMappingScope(String),
     #[error("error parsing utf-8")]
-    ParseUtf8Error(#[from] FromUtf8Error),
+    ParseUtf8(#[from] FromUtf8Error),
     #[error("unable to set variable `{0}`")]
-    ParseVariableError(String),
+    ParseVariable(String),
     #[error("unable to parse button `{0}`")]
-    ParseButtonError(String),
+    ParseButton(String),
     #[error("invalid state index")]
-    StateIndexError,
+    StateIndex,
     #[error("reached last match")]
     ReachedLastMachted,
     #[error("i/o error")]
-    IOError(#[from] std::io::Error),
+    IO(#[from] std::io::Error),
     #[error("unknown filename `{0}`")]
     UnknownFilename(String),
     #[error("{0}")]
-    GlobalError(String),
+    Global(String),
     #[error("could not properly parse git output")]
-    GitParsingError,
+    GitParsing,
     #[error("not inside a git repository")]
-    NotInGitRepoError,
+    NotInGitRepo,
     #[error("error running a git command")]
-    GitCommandError,
+    GitCommand,
     #[error("could not properly highlight code")]
-    SyntaxError(#[from] syntect::Error),
+    Syntax(#[from] syntect::Error),
 }

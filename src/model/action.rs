@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::errors::Error;
+use crate::model::errors::Error;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CommandType {
@@ -101,7 +101,7 @@ impl FromStr for Action {
                         return Ok(Action::GoTo(number - 1));
                     }
                 };
-                return Ok(Action::GoTo(0));
+                Ok(Action::GoTo(0))
             }
             _ => {
                 if let Ok(number) = s.parse::<usize>() {
@@ -113,7 +113,7 @@ impl FromStr for Action {
                     Some('!') => CommandType::Sync,
                     Some('>') => CommandType::SyncQuit,
                     Some('@') => CommandType::Async,
-                    _ => return Err(Error::ParseActionError(s.to_string())),
+                    _ => return Err(Error::ParseAction(s.to_string())),
                 };
 
                 Ok(Action::Command(command_type, s[1..].to_string()))

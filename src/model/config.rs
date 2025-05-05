@@ -7,13 +7,13 @@ use std::{
 
 use regex::Regex;
 
-use crate::{
+use crate::model::{
     action::Action,
     errors::Error,
     git::{FileStatus, StagedStatus},
 };
 
-const DEFAULT_CONFIG: &str = include_str!("../config/.gitrsrc");
+const DEFAULT_CONFIG: &str = include_str!("../../config/.gitrsrc");
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum MappingScope {
@@ -61,7 +61,7 @@ impl FromStr for MappingScope {
                 };
                 Ok(MappingScope::Status(staged_status, file_status))
             }
-            _ => Err(Error::ParseMappingScopeError(s.to_string())),
+            _ => Err(Error::ParseMappingScope(s.to_string())),
         }
     }
 }
@@ -97,7 +97,7 @@ impl Config {
             "button" => self.parse_button_line(params, default)?,
             _ => (),
         };
-        return Ok(());
+        Ok(())
     }
 
     pub fn parse_map_line(&mut self, params: &str, default: bool) -> Result<(), Error> {
@@ -122,7 +122,7 @@ impl Config {
     pub fn parse_set_line(&mut self, params: &str) -> Result<(), Error> {
         let parts: Vec<&str> = params.splitn(2, ' ').collect();
         if parts.len() < 2 {
-            return Err(Error::ParseVariableError(params.to_string()));
+            return Err(Error::ParseVariable(params.to_string()));
         }
         let key = parts[0].to_string();
         let value = parts[1].to_string();
@@ -145,14 +145,14 @@ impl Config {
             "clipboard" => self.clipboard_tool = value,
             "default_mappings" => self.use_default_mappings = value == "true",
             "default_buttons" => self.use_default_buttons = value == "true",
-            _ => return Err(Error::ParseVariableError(params.to_string())),
+            _ => return Err(Error::ParseVariable(params.to_string())),
         }
         Ok(())
     }
 
     pub fn parse_button_line(&mut self, params: &str, default: bool) -> Result<(), Error> {
         let re = Regex::new(r#"^(\S+)\s+("(?:[^"]+)"|\S+)\s+(.*)"#).unwrap();
-        if let Some(caps) = re.captures(&params) {
+        if let Some(caps) = re.captures(params) {
             let mode = caps[1].to_string().parse()?;
             let mut name = caps[2].to_string();
             if name.starts_with('"') && name.ends_with('"') {
@@ -168,9 +168,9 @@ impl Config {
             let mode_buttons = buttons.entry(mode).or_insert_with(Vec::new);
             mode_buttons.retain(|(k, _)| *k != name);
             mode_buttons.push((name, action));
-            return Ok(());
+            Ok(())
         } else {
-            return Err(Error::ParseButtonError(params.to_string()));
+            Err(Error::ParseButton(params.to_string()))
         }
     }
 
@@ -231,9 +231,8 @@ impl Default for Config {
 }
 
 pub fn parse_gitrs_config() -> Result<Config, Error> {
-    let home = std::env::var("HOME").map_err(|_| {
-        Error::GlobalError("could not read `HOME` environment variable".to_string())
-    })?;
+    let home = std::env::var("HOME")
+        .map_err(|_| Error::Global("could not read `HOME` environment variable".to_string()))?;
     let result = fs::File::open(home + "/.gitrsrc");
 
     let mut config: Config = Config::default();
