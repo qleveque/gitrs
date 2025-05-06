@@ -3,7 +3,7 @@ use chrono::{NaiveDate, Utc};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Position, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Clear, Paragraph, Widget},
     Frame,
 };
@@ -62,35 +62,36 @@ pub fn clean_buggy_characters(line: &str) -> String {
     line.replace("\t", "    ").replace("\r", "^M")
 }
 
-pub fn display_search_bar(
-    search_string: &str,
-    search_reverse: bool,
+pub fn display_edit_bar(
+    edit_string: &str,
+    prefix: &str,
+    cursor: usize,
     chunk: &mut Rect,
     frame: &mut Frame,
 ) {
-    let search_string = match search_reverse {
-        false => format!("/{}│", search_string),
-        true => format!("?{}│", search_string),
-    };
-    let paragraph = Paragraph::new(search_string.clone());
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(*chunk);
-    frame.render_widget(Clear, chunks[1]);
-    Widget::render(&paragraph, chunks[1], frame.buffer_mut());
-    *chunk = chunks[0];
-}
+    let mut displayed_string = edit_string.to_string();
+    displayed_string.push(' ');
+    let chars: Vec<char> = displayed_string.chars().collect();
+    let before: String = chars[..cursor].iter().collect();
+    let middle: String = chars[cursor..cursor + 1].iter().collect();
+    let after: String = chars[cursor + 1..].iter().collect();
 
-pub fn display_cmd_line(command_string: &str, chunk: &mut Rect, frame: &mut Frame) {
-    let command_string = format!(":{}│", command_string);
-    let paragraph = Paragraph::new(command_string);
+    let spans = vec![
+        Span::styled(prefix.to_string(), Style::from(Color::Blue)),
+        Span::raw(before),
+        Span::styled(middle, Style::default().add_modifier(Modifier::REVERSED)),
+        Span::raw(after),
+    ];
+    let line = Line::from(spans);
+
+    let paragraph = Paragraph::new(line);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
         .split(*chunk);
     frame.render_widget(Clear, chunks[1]);
     Widget::render(&paragraph, chunks[1], frame.buffer_mut());
+
     *chunk = chunks[0];
 }
 

@@ -29,8 +29,8 @@ use crate::{
         errors::Error,
     },
     ui::utils::{
-        display_cmd_line, display_menu_bar, display_notifications, display_search_bar,
-        search_highlight_style, SPINNER_FRAMES,
+        display_edit_bar, display_menu_bar, display_notifications, search_highlight_style,
+        SPINNER_FRAMES,
     },
     views::{
         pager::{PagerApp, PagerCommand},
@@ -238,16 +238,27 @@ pub trait GitApp {
 
                 let state = self.get_state();
 
-                if state.input_state == InputState::Search {
-                    display_search_bar(
-                        &state.search_string,
-                        state.search_reverse,
+                if state.input_state != InputState::App {
+                    let edit_string = match state.input_state {
+                        InputState::Search => &state.search_string,
+                        InputState::Command => &state.command_string,
+                        InputState::App => "",
+                    };
+                    let edit_line_prefix = match state.input_state {
+                        InputState::Search => match state.search_reverse {
+                            false => "/",
+                            true => "?",
+                        },
+                        InputState::Command => ":",
+                        InputState::App => "",
+                    };
+                    display_edit_bar(
+                        edit_string,
+                        edit_line_prefix,
+                        state.edit_cursor,
                         &mut chunk,
                         frame,
                     );
-                }
-                if state.input_state == InputState::Command {
-                    display_cmd_line(&state.command_string, &mut chunk, frame);
                 }
 
                 display_notifications(
@@ -348,11 +359,13 @@ pub trait GitApp {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = false;
                 self.state().input_state = InputState::Search;
+                self.state().edit_cursor = 0;
             }
             Action::SearchReverse => {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = true;
                 self.state().input_state = InputState::Search;
+                self.state().edit_cursor = 0;
             }
             Action::TypeCommand => self.state().input_state = InputState::Command,
             Action::NextSearchResult => self.search_result(false)?,
@@ -484,33 +497,91 @@ pub trait GitApp {
 
     fn handle_line_edited(&mut self, key_event: KeyEvent) -> Result<Option<Action>, Error> {
         let input_state = self.state().input_state.clone();
+        let mut cursor = self.get_state().edit_cursor;
+
+        let ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
         let line = match input_state {
             InputState::Search => &mut self.state().search_string,
             InputState::Command => &mut self.state().command_string,
             InputState::App => return Ok(None),
         };
         match key_event.code {
-            KeyCode::Enter => {
-                // Return :command action if any
-                match input_state {
-                    InputState::Command => {
-                        let action = line.parse::<Action>()?;
-                        line.clear();
-                        self.state().input_state = InputState::App;
-                        return Ok(Some(action));
+            KeyCode::Enter => match input_state {
+                InputState::Command => {
+                    let action = line.parse::<Action>()?;
+                    line.clear();
+                    self.state().input_state = InputState::App;
+                    return Ok(Some(action));
+                }
+                InputState::Search => {
+                    self.state().input_state = InputState::App;
+                    return Ok(Some(Action::NextSearchResult));
+                }
+                InputState::App => (),
+            },
+            KeyCode::Esc => self.cancel_input(),
+            KeyCode::Left => {
+                if !ctrl {
+                    if cursor > 0 {
+                        cursor -= 1;
                     }
-                    InputState::Search => {
-                        self.state().input_state = InputState::App;
-                        return Ok(Some(Action::NextSearchResult));
+                } else {
+                    let chars: Vec<char> = line.chars().collect();
+                    while cursor > 0 && chars[cursor - 1].is_whitespace() {
+                        cursor -= 1;
                     }
-                    InputState::App => (),
+                    while cursor > 0 && !chars[cursor - 1].is_whitespace() {
+                        cursor -= 1;
+                    }
+                }
+                self.state().edit_cursor = cursor;
+            }
+            KeyCode::Right => {
+                if !ctrl {
+                    if cursor < line.chars().count() {
+                        cursor += 1;
+                    }
+                } else {
+                    let chars: Vec<char> = line.chars().collect();
+                    while cursor < chars.len() && !chars[cursor].is_whitespace() {
+                        cursor += 1;
+                    }
+                    while cursor < chars.len() && chars[cursor].is_whitespace() {
+                        cursor += 1;
+                    }
+                }
+                self.state().edit_cursor = cursor;
+            }
+            KeyCode::Backspace => {
+                if cursor > 0 {
+                    let mut chars: Vec<char> = line.chars().collect();
+
+                    if ctrl {
+                        while cursor > 0 && chars[cursor - 1].is_whitespace() {
+                            cursor -= 1;
+                        }
+                        let new_cursor = cursor;
+                        while cursor > 0 && !chars[cursor - 1].is_whitespace() {
+                            cursor -= 1;
+                        }
+                        chars.drain(cursor..new_cursor);
+                    } else {
+                        chars.remove(cursor - 1);
+                        cursor -= 1;
+                    }
+
+                    *line = chars.iter().collect();
+                    self.state().edit_cursor = cursor;
                 }
             }
-            KeyCode::Esc => self.cancel_input(),
-            KeyCode::Backspace => {
-                line.pop();
+            KeyCode::Char(c) => {
+                let mut new_line: Vec<char> = line.chars().collect();
+                let before = new_line.len();
+                new_line.insert(cursor, c);
+                let after = new_line.len();
+                *line = new_line.iter().collect();
+                self.state().edit_cursor += after - before;
             }
-            KeyCode::Char(c) => line.push(c),
             _ => {
                 let message = "error: this char is not handled yet".to_string();
                 self.notif(NotifChannel::Error, Some(message));
