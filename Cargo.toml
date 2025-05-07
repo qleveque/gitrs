@@ -1,6 +1,6 @@
 [package]
 name = "gitrs"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 
 [dependencies]
@@ -14,3 +14,4 @@ ansi-to-tui = "7.0.0"
 strip-ansi-escapes = "0.2.1"
 chrono = "0.4.40"
 atty = "0.2.14"
+two-face = "0.4.3"

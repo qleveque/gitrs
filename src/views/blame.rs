@@ -8,10 +8,11 @@ use crate::model::{
 };
 use crate::ui::utils::{date_to_color, highlight_style};
 
+use two_face::re_exports::syntect;
+use two_face::syntax;
 use syntect::{
     easy::HighlightLines,
     highlighting::{Style as SyntectStyle, ThemeSet},
-    parsing::SyntaxSet,
 };
 
 use ratatui::{
@@ -81,8 +82,8 @@ impl<'a> BlameApp {
             .to_string())
     }
 
-    fn highlighted_lines(&self) -> Result<Vec<Line<'a>>, Error> {
-        let ps = SyntaxSet::load_defaults_newlines();
+    fn highlighted_lines(&mut self) -> Result<Vec<Line<'a>>, Error> {
+        let syn_set = syntax::extra_newlines();
         let ts = ThemeSet::load_defaults();
         let theme = &ts.themes["base16-ocean.dark"];
 
@@ -91,10 +92,10 @@ impl<'a> BlameApp {
         let syntax = path
             .extension()
             .and_then(|ext| ext.to_str())
-            .and_then(|ext| ps.find_syntax_by_extension(ext))
+            .and_then(|ext| syn_set.find_syntax_by_extension(ext))
             .unwrap_or_else(|| {
-                ps.find_syntax_by_first_line(&file_text)
-                    .unwrap_or_else(|| ps.find_syntax_plain_text())
+                syn_set.find_syntax_by_first_line(&file_text)
+                    .unwrap_or_else(|| syn_set.find_syntax_plain_text())
             });
         let mut h = HighlightLines::new(syntax, theme);
 
@@ -102,7 +103,7 @@ impl<'a> BlameApp {
 
         for line in LinesWithEndings::from(&file_text) {
             let ranges: Vec<(SyntectStyle, String)> = h
-                .highlight_line(line, &ps)?
+                .highlight_line(line, &syn_set)?
                 .into_iter()
                 .map(|(style, text)| (style, text.to_string())) // Convert &str to owned String
                 .collect();

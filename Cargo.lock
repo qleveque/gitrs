@@ -385,7 +385,7 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "gitrs"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "ansi-to-tui",
  "atty",
@@ -397,6 +397,7 @@ dependencies = [
  "strip-ansi-escapes",
  "syntect",
  "thiserror 2.0.12",
+ "two-face",
 ]
 
 [[package]]
@@ -1049,6 +1050,17 @@ checksum = "29aa485584182073ed57fd5004aa09c371f021325014694e432313345865fd04"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "two-face"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "384eda438ddf62e2c6f39a174452d952d9d9df5a8ad5ade22198609f8dcaf852"
+dependencies = [
+ "once_cell",
+ "serde",
+ "syntect",
 ]
 
 [[package]]
