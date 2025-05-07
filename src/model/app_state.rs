@@ -40,6 +40,7 @@ pub struct AppState {
     pub input_state: InputState,
     pub list_state: ListState,
     pub region_to_action: Vec<(Rect, Action)>,
+    pub edit_bar_rect: Rect,
     pub mouse_position: Position,
     pub mouse_down: bool,
 }
@@ -59,6 +60,7 @@ impl AppState {
             input_state: InputState::App,
             list_state: ListState::default(),
             region_to_action: Vec::new(),
+            edit_bar_rect: Rect::default(),
             mouse_position: Position::default(),
             mouse_down: false,
         };

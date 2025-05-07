@@ -226,7 +226,7 @@ pub trait GitApp {
         loop {
             terminal.draw(|frame| {
                 let mut chunk = frame.area();
-                self.state().region_to_action = display_menu_bar(
+                let region_to_action = display_menu_bar(
                     &self.buttons(),
                     self.get_state().mouse_position,
                     self.get_state().mouse_down,
@@ -238,6 +238,7 @@ pub trait GitApp {
 
                 let state = self.get_state();
 
+                let mut edit_bar_rect = Rect::default();
                 if state.input_state != InputState::App {
                     let edit_string = match state.input_state {
                         InputState::Search => &state.search_string,
@@ -252,7 +253,7 @@ pub trait GitApp {
                         InputState::Command => ":",
                         InputState::App => "",
                     };
-                    display_edit_bar(
+                    edit_bar_rect = display_edit_bar(
                         edit_string,
                         edit_line_prefix,
                         state.edit_cursor,
@@ -269,6 +270,9 @@ pub trait GitApp {
                     frame,
                 );
                 notif_time = (notif_time + 1) % SPINNER_FRAMES.len();
+
+                self.state().edit_bar_rect = edit_bar_rect;
+                self.state().region_to_action = region_to_action;
             })?;
 
             // continue search if one is active
@@ -307,13 +311,14 @@ pub trait GitApp {
         Ok(())
     }
 
-    fn cancel_input(&mut self) {
+    fn exit_input_line(&mut self) {
         let input_state = self.state().input_state.clone();
         match input_state {
             InputState::Search => self.state().search_string.clear(),
             InputState::Command => self.state().command_string.clear(),
             InputState::App => (),
         }
+        self.state().edit_cursor = 0;
         self.state().input_state = InputState::App;
     }
 
@@ -358,16 +363,20 @@ pub trait GitApp {
             Action::Search => {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = false;
-                self.state().input_state = InputState::Search;
                 self.state().edit_cursor = 0;
+                self.state().input_state = InputState::Search;
             }
             Action::SearchReverse => {
                 self.state().search_string = "".to_string();
                 self.state().search_reverse = true;
-                self.state().input_state = InputState::Search;
                 self.state().edit_cursor = 0;
+                self.state().input_state = InputState::Search;
             }
-            Action::TypeCommand => self.state().input_state = InputState::Command,
+            Action::TypeCommand => {
+                self.state().edit_cursor = 0;
+                self.state().command_string = "".to_string();
+                self.state().input_state = InputState::Command;
+            }
             Action::NextSearchResult => self.search_result(false)?,
             Action::PreviousSearchResult => self.search_result(true)?,
             Action::GoTo(line) => self.state().list_state.select(Some(*line)),
@@ -508,10 +517,12 @@ pub trait GitApp {
         match key_event.code {
             KeyCode::Enter => match input_state {
                 InputState::Command => {
-                    let action = line.parse::<Action>()?;
-                    line.clear();
+                    let ret = match line.parse::<Action>() {
+                        Ok(action) => Ok(Some(action)),
+                        Err(error) => Err(error),
+                    };
                     self.state().input_state = InputState::App;
-                    return Ok(Some(action));
+                    return ret;
                 }
                 InputState::Search => {
                     self.state().input_state = InputState::App;
@@ -519,7 +530,7 @@ pub trait GitApp {
                 }
                 InputState::App => (),
             },
-            KeyCode::Esc => self.cancel_input(),
+            KeyCode::Esc => self.exit_input_line(),
             KeyCode::Left => {
                 if !ctrl {
                     if cursor > 0 {
@@ -593,7 +604,30 @@ pub trait GitApp {
     fn on_click(&mut self) {}
     fn handle_click_event(&mut self, mouse_button: MouseButton) -> Result<Option<Action>, Error> {
         // for the time being, cancel line inputs
-        self.cancel_input();
+        let input_state = self.get_state().input_state.clone();
+        if input_state != InputState::App {
+            let mouse_position = self.get_state().mouse_position;
+            if self.get_state().edit_bar_rect.contains(mouse_position) {
+                // TODO: line edit should be a proper object, this is not good
+                let cursor = mouse_position.x as usize;
+                let line = match input_state {
+                    InputState::Search => &self.state().search_string,
+                    InputState::Command => &self.state().command_string,
+                    InputState::App => return Ok(None),
+                };
+                self.state().edit_cursor = if cursor > line.chars().count() {
+                    line.chars().count()
+                } else if cursor <= 1 {
+                    0
+                } else {
+                    cursor - 1
+                };
+            } else {
+                self.exit_input_line();
+            }
+            return Ok(None);
+        }
+
         self.state().notif = HashMap::new();
         self.state().mouse_down = true;
 

@@ -68,7 +68,7 @@ pub fn display_edit_bar(
     cursor: usize,
     chunk: &mut Rect,
     frame: &mut Frame,
-) {
+) -> Rect {
     let mut displayed_string = edit_string.to_string();
     displayed_string.push(' ');
     let chars: Vec<char> = displayed_string.chars().collect();
@@ -93,6 +93,7 @@ pub fn display_edit_bar(
     Widget::render(&paragraph, chunks[1], frame.buffer_mut());
 
     *chunk = chunks[0];
+    chunks[1]
 }
 
 pub fn display_notifications(
